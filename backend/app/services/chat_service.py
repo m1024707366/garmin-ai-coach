@@ -19,7 +19,7 @@ from backend.app.db.crud import (
 from backend.app.db.models import GarminCredential, User
 from backend.app.services.data_processor import DataProcessor
 from backend.app.services.garmin_client import GarminClient
-from backend.app.services.gemini_service import GeminiService
+from backend.app.services.llm_factory import get_llm_service
 from backend.app.utils.crypto import decrypt_text
 from src.core.config import settings
 
@@ -59,10 +59,10 @@ class ChatService:
     def __init__(
         self,
         *,
-        gemini: Optional[GeminiService] = None,
-        processor: Optional[DataProcessor] = None,
+        llm = None,
     ) -> None:
-        self.gemini = gemini or GeminiService()
+        self.gemini = llm or get_llm_service()
+        self.processor = processor or DataProcessor()
         self.processor = processor or DataProcessor()
 
     def reply(

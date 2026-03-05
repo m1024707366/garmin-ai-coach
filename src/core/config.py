@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     GARMIN_EMAIL: str
     GARMIN_PASSWORD: str
-    GEMINI_API_KEY: str
+    GEMINI_API_KEY: Optional[str] = None  # 保留兼容，可选
     GARMIN_IS_CN: bool = False  # True = connect.garmin.cn（中国），False = connect.garmin.com（国际）
     PROXY_URL: Optional[str] = None  # 代理 URL，用于访问 Google API（例如：http://127.0.0.1:7890）
 
@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     GEMINI_LIST_MODELS: bool = False  # 调试用：启动时列出可用模型
     GEMINI_MODEL_NAME: str = "gemini-3-flash-preview"
 
+    # DeepSeek
+    DEEPSEEK_API_KEY: Optional[str] = None
+    DEEPSEEK_MODEL_NAME: str = "deepseek-reasoner"  # R1 推理模型
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
+    LLM_PROVIDER: str = "deepseek"  # "deepseek" 或 "gemini"
     # Runtime behavior
     USE_MOCK_MODE: bool = False
     ANALYSIS_CACHE_HOURS: int = 24

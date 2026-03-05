@@ -32,12 +32,13 @@ from backend.app.api.wechat import router as wechat_router
 from backend.app.deps.auth import get_current_wechat_user
 from backend.app.services.garmin_client import GarminClient
 from backend.app.services.data_processor import DataProcessor
-from backend.app.services.gemini_service import GeminiService
+from backend.app.services.llm_factory import get_llm_service
 from backend.app.services.home_summary_service import HomeSummaryService
 from backend.app.services.report_service import ReportService
+from backend.app.services.coach_report_service import CoachReportService
 from backend.app.jobs.scheduler import start_scheduler
-from backend.app.db.crud import get_home_summary, upsert_home_summary
-from backend.app.db.models import WechatUser
+from backend.app.db.crud import get_home_summary, upsert_home_summary, get_garmin_credential, get_coach_memory, upsert_coach_memory, get_injury_logs, create_injury_log, update_injury_log
+from backend.app.db.models import WechatUser, User
 from backend.app.db.session import get_db_optional, init_db
 from src.services.garmin_service import GarminService
 from src.core.config import settings
@@ -171,28 +172,32 @@ def get_data_processor() -> DataProcessor:
     return DataProcessor()
 
 
-def get_gemini_service() -> GeminiService:
-    """获取 GeminiService 实例（依赖注入）。"""
-    global _gemini_singleton
-    if _gemini_singleton is None:
-        _gemini_singleton = GeminiService()
-    return _gemini_singleton
+_llm_singleton = None
 
+
+def get_llm():
+    """获取 LLM 服务实例（依赖注入）。根据 LLM_PROVIDER 配置自动切换 DeepSeek/Gemini。"""
+    global _llm_singleton
+    if _llm_singleton is None:
+        _llm_singleton = get_llm_service()
+    return _llm_singleton
 
 def get_report_service(
     processor: DataProcessor = Depends(get_data_processor),
-    gemini: GeminiService = Depends(get_gemini_service),
+    llm=Depends(get_llm),
 ) -> ReportService:
-    return ReportService(processor=processor, gemini=gemini)
+    return ReportService(processor=processor, llm=llm)
 
 
 def get_home_summary_service(
-    gemini: GeminiService = Depends(get_gemini_service),
+    llm=Depends(get_llm),
 ) -> HomeSummaryService:
-    return HomeSummaryService(gemini=gemini)
+    return HomeSummaryService(llm=llm)
 
-
-_gemini_singleton: Optional[GeminiService] = None
+def get_coach_report_service(
+    llm=Depends(get_llm),
+) -> CoachReportService:
+    return CoachReportService(llm=llm)
 
 
 def _convert_activity_for_processor(activity: Dict[str, Any]) -> Dict[str, Any]:
@@ -398,7 +403,7 @@ async def get_period_analysis(
     period: str,  # "week" or "month"
     db: Optional[Session] = Depends(get_db_optional),
     current_user: WechatUser = Depends(get_current_wechat_user),
-    gemini: GeminiService = Depends(get_gemini_service),
+    llm=Depends(get_llm),
 ):
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
@@ -415,9 +420,8 @@ async def get_period_analysis(
     else:
         raise HTTPException(status_code=400, detail="无效的周期类型")
 
-    # 获取 Garmin 凭证和 User
-    from backend.app.db.crud import get_garmin_credential
-    from backend.app.db.models import User, Activity, GarminDailySummary
+    # 获取 Garmin 凭证和 User（crud/models 已在顶部导入）
+    from backend.app.db.models import Activity, GarminDailySummary
     from sqlalchemy import func
 
     credential = get_garmin_credential(db, wechat_user_id=current_user.id)
@@ -496,45 +500,6 @@ async def get_period_analysis(
 
     # ====== AI 分析（含训练建议）======
     ai_analysis = None
-    # 周至少 1 次跑步 + 1 天睡眠，月至少 3 次跑步 + 3 天睡眠
-    min_run = 1 if period == "week" else 3
-    min_sleep = 1 if period == "week" else 3
-
-    if run_count >= min_run and sleep_days >= min_sleep:
-        try:
-            prompt = f"""你是专业跑步教练，请分析以下数据并给出针对性的训练建议。
-
-=== 当前周期数据 ===
-周期：{period}
-日期：{start_date} 至 {end_date}
-跑步次数：{run_count} 次
-总跑量：{total_distance:.1f} km
-平均速度：{avg_speed or '-'} km/h
-睡眠天数：{sleep_days} 天
-平均睡眠：{avg_sleep_hours or '-'} 小时
-
-=== 历史趋势 ===
-上周期跑量：{prev_total_distance:.1f} km（{prev_run_count} 次）
-当前周期跑量：{total_distance:.1f} km
-跑量趋势：{distance_trend}
-跑步频次趋势：{frequency_trend}
-近 30 天跑量：{recent_total_distance:.1f} km（{recent_run_count} 次）
-
-=== 输出要求 ===
-1. 首先简要总结当前周期表现
-2. 分析训练趋势（是否在按计划提升？）
-3. 根据当前状态和历史趋势，**为下一周期（未来 7 天）制定具体的训练课表**
-4. 课表必须包含：日期、训练类型、时长/距离、目标
-
-注意：
-- 如果用户近 30 天跑量 > 100km 且趋势增长，建议维持或适当减少，避免过度训练
-- 如果用户近 30 天跑量 < 50km 且趋势下降，建议增加跑量基础
-- 如果明天或后天有大课（间歇、节奏跑），今天必须安排恢复
-- 输出格式：先用 Markdown 总结分析，然后给出未来 7 天课表
-"""
-            ai_analysis = gemini.analyze_training(prompt)
-        except Exception as e:
-            logger.warning(f"[PeriodAnalysis] AI analysis failed: {e}")
 
     # AI 分析
     ai_analysis = None
@@ -554,7 +519,7 @@ async def get_period_analysis(
                 f"睡眠天数：{sleep_days}\n"
                 f"平均睡眠：{avg_sleep_hours or '-'} 小时"
             )
-            ai_analysis = gemini.analyze_training(prompt)
+            ai_analysis = llm.analyze_training(prompt)
         except Exception as e:
             logger.warning(f"[PeriodAnalysis] AI analysis failed: {e}")
 
@@ -636,6 +601,399 @@ async def get_daily_analysis(
             status_code=500,
             detail=f"服务器内部错误: {str(e)}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Pydantic 请求/响应模型 —— 伤病记录 & 教练记忆
+# ---------------------------------------------------------------------------
+
+class InjuryLogCreateRequest(BaseModel):
+    """创建伤病日志请求（字段名匹配前端 InjuryLogCreateRequest）"""
+    body_part: str
+    injury_type: Optional[str] = None
+    severity: int  # 1-10（前端用 severity，后端存 pain_level）
+    description: Optional[str] = None
+    occurred_date: Optional[str] = None  # YYYY-MM-DD（前端用 occurred_date，后端存 log_date）
+
+
+class InjuryLogUpdateRequest(BaseModel):
+    """更新伤病日志请求"""
+    severity: Optional[int] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None  # 前端用 is_active(bool)，后端存 is_resolved(反转)
+
+
+class CoachProfileRequest(BaseModel):
+    """更新教练记忆（运动员档案）请求（字段名匹配前端 CoachProfileUpdateRequest）"""
+    max_hr: Optional[int] = None
+    rest_hr: Optional[int] = None
+    vo2max: Optional[float] = None
+    lthr: Optional[int] = None
+    ftp: Optional[int] = None
+    injury_history: Optional[str] = None
+    training_preference: Optional[str] = None
+    race_target: Optional[str] = None  # 前端用 race_target，后端存 target_race
+    race_date: Optional[str] = None  # 前端用 race_date，后端存 target_race_date (YYYY-MM-DD)
+    pb_5k_seconds: Optional[int] = None
+    pb_10k_seconds: Optional[int] = None
+    pb_half_seconds: Optional[int] = None
+    pb_full_seconds: Optional[int] = None
+    weekly_mileage_goal_km: Optional[float] = None
+    target_finish_time_seconds: Optional[int] = None
+    notes: Optional[str] = None
+
+# ---------------------------------------------------------------------------
+# T7: 伤病记录 API
+# ---------------------------------------------------------------------------
+
+@app.post("/api/coach/injury-log")
+async def create_injury_log_endpoint(
+    req: InjuryLogCreateRequest,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+):
+    """新增伤病日志"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 解析日期（前端传 occurred_date，可选，默认今天）
+    log_date_parsed = date.today()
+    if req.occurred_date:
+        try:
+            log_date_parsed = datetime.strptime(req.occurred_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="日期格式无效，请使用 YYYY-MM-DD")
+
+    if not (1 <= req.severity <= 10):
+        raise HTTPException(status_code=400, detail="severity 须在 1-10 之间")
+
+    row = create_injury_log(
+        db,
+        user_id=user.id,
+        log_date=log_date_parsed,
+        body_part=req.body_part,
+        pain_level=req.severity,
+        description=req.description,
+        is_resolved=0,
+        injury_type=req.injury_type,
+    )
+    db.commit()
+    return {
+        "id": row.id,
+        "body_part": row.body_part,
+        "injury_type": row.injury_type,
+        "severity": row.pain_level,
+        "description": row.description,
+        "occurred_date": row.log_date.isoformat(),
+        "is_active": not bool(row.is_resolved),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+@app.get("/api/coach/injury-log")
+async def get_injury_logs_endpoint(
+    only_active: bool = False,
+    limit: int = 30,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+):
+    """获取伤病日志列表"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    logs = get_injury_logs(db, user_id=user.id, only_active=only_active, limit=limit)
+    return [
+        {
+            "id": log.id,
+            "body_part": log.body_part,
+            "injury_type": getattr(log, 'injury_type', None),
+            "severity": log.pain_level,
+            "description": log.description,
+            "occurred_date": log.log_date.isoformat(),
+            "is_active": not bool(log.is_resolved),
+            "created_at": log.created_at.isoformat() if log.created_at else None,
+            "updated_at": log.updated_at.isoformat() if log.updated_at else None,
+        }
+        for log in logs
+    ]
+
+
+@app.put("/api/coach/injury-log/{log_id}")
+async def update_injury_log_endpoint(
+    log_id: int,
+    req: InjuryLogUpdateRequest,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+):
+    """更新伤病日志"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    if req.severity is not None and not (1 <= req.severity <= 10):
+        raise HTTPException(status_code=400, detail="severity 须在 1-10 之间")
+
+    # 前端 is_active(bool) 转后端 is_resolved(int，反转)
+    is_resolved_val = None
+    if req.is_active is not None:
+        is_resolved_val = 0 if req.is_active else 1
+
+    row = update_injury_log(
+        db,
+        log_id=log_id,
+        user_id=user.id,
+        pain_level=req.severity,
+        description=req.description,
+        is_resolved=is_resolved_val,
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="伤病记录不存在")
+
+    db.commit()
+    return {
+        "id": row.id,
+        "body_part": row.body_part,
+        "injury_type": getattr(row, 'injury_type', None),
+        "severity": row.pain_level,
+        "description": row.description,
+        "occurred_date": row.log_date.isoformat(),
+        "is_active": not bool(row.is_resolved),
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# T8: 教练记忆（运动员档案）API
+# ---------------------------------------------------------------------------
+
+@app.get("/api/coach/profile")
+async def get_coach_profile_endpoint(
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+):
+    """获取运动员档案"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    memory = get_coach_memory(db, user_id=user.id)
+    if not memory:
+        return {
+            "user_id": user.id,
+            "max_hr": None,
+            "rest_hr": None,
+            "vo2max": None,
+            "lthr": None,
+            "ftp": None,
+            "injury_history": None,
+            "training_preference": None,
+            "race_target": None,
+            "race_date": None,
+            "pb_5k_seconds": None,
+            "pb_10k_seconds": None,
+            "pb_half_seconds": None,
+            "pb_full_seconds": None,
+            "weekly_mileage_goal_km": None,
+            "target_finish_time_seconds": None,
+            "notes": None,
+        }
+
+    return {
+        "user_id": memory.user_id,
+        "max_hr": memory.max_hr,
+        "rest_hr": memory.rest_hr,
+        "vo2max": memory.vo2max,
+        "lthr": memory.lthr,
+        "ftp": memory.ftp,
+        "injury_history": memory.injury_history,
+        "training_preference": memory.training_preference,
+        "race_target": memory.target_race,
+        "race_date": memory.target_race_date.isoformat() if memory.target_race_date else None,
+        "pb_5k_seconds": memory.pb_5k_seconds,
+        "pb_10k_seconds": memory.pb_10k_seconds,
+        "pb_half_seconds": memory.pb_half_seconds,
+        "pb_full_seconds": memory.pb_full_seconds,
+        "weekly_mileage_goal_km": memory.weekly_mileage_goal_km,
+        "target_finish_time_seconds": memory.target_finish_time_seconds,
+        "notes": memory.notes,
+    }
+
+
+@app.put("/api/coach/profile")
+async def update_coach_profile_endpoint(
+    req: CoachProfileRequest,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+):
+    """创建或更新运动员档案"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 解析日期（前端传 race_date）
+    race_date_parsed = None
+    if req.race_date:
+        try:
+            race_date_parsed = datetime.strptime(req.race_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="race_date 格式无效，请使用 YYYY-MM-DD")
+
+    memory = upsert_coach_memory(
+        db,
+        user_id=user.id,
+        target_race=req.race_target,
+        target_race_date=race_date_parsed,
+        pb_5k_seconds=req.pb_5k_seconds,
+        pb_10k_seconds=req.pb_10k_seconds,
+        pb_half_seconds=req.pb_half_seconds,
+        pb_full_seconds=req.pb_full_seconds,
+        weekly_mileage_goal_km=req.weekly_mileage_goal_km,
+        target_finish_time_seconds=req.target_finish_time_seconds,
+        notes=req.notes,
+        max_hr=req.max_hr,
+        rest_hr=req.rest_hr,
+        vo2max=req.vo2max,
+        lthr=req.lthr,
+        ftp=req.ftp,
+        injury_history=req.injury_history,
+        training_preference=req.training_preference,
+    )
+    db.commit()
+
+    return {
+        "user_id": memory.user_id,
+        "max_hr": memory.max_hr,
+        "rest_hr": memory.rest_hr,
+        "vo2max": memory.vo2max,
+        "lthr": memory.lthr,
+        "ftp": memory.ftp,
+        "injury_history": memory.injury_history,
+        "training_preference": memory.training_preference,
+        "race_target": memory.target_race,
+        "race_date": memory.target_race_date.isoformat() if memory.target_race_date else None,
+        "pb_5k_seconds": memory.pb_5k_seconds,
+        "pb_10k_seconds": memory.pb_10k_seconds,
+        "pb_half_seconds": memory.pb_half_seconds,
+        "pb_full_seconds": memory.pb_full_seconds,
+        "weekly_mileage_goal_km": memory.weekly_mileage_goal_km,
+        "target_finish_time_seconds": memory.target_finish_time_seconds,
+        "notes": memory.notes,
+    }
+
+
+# ==================== T4: 晨间报告 ====================
+
+@app.get("/api/coach/morning-report")
+async def morning_report_endpoint(
+    target_date: Optional[str] = None,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+    service: CoachReportService = Depends(get_coach_report_service),
+):
+    """晨间报告：基于昨晚睡眠和近期训练负荷，给出今日训练建议。"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    dt = date.fromisoformat(target_date) if target_date else date.today()
+    try:
+        result = service.build_morning_report(db, user.id, dt)
+        return result
+    except Exception as e:
+        logger.error(f"晨间报告生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"晨间报告生成失败: {str(e)}")
+
+
+# ==================== T5: 晚间复盘 ====================
+
+@app.get("/api/coach/evening-review")
+async def evening_review_endpoint(
+    target_date: Optional[str] = None,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+    service: CoachReportService = Depends(get_coach_report_service),
+):
+    """晚间复盘：基于今日训练数据，给出恢复建议和明日展望。"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    dt = date.fromisoformat(target_date) if target_date else date.today()
+    try:
+        result = service.build_evening_review(db, user.id, dt)
+        return result
+    except Exception as e:
+        logger.error(f"晚间复盘生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"晚间复盘生成失败: {str(e)}")
+
+
+# ==================== T6: 周度总结 ====================
+
+@app.get("/api/coach/weekly-summary")
+async def weekly_summary_endpoint(
+    target_date: Optional[str] = None,
+    db: Optional[Session] = Depends(get_db_optional),
+    current_user: WechatUser = Depends(get_current_wechat_user),
+    service: CoachReportService = Depends(get_coach_report_service),
+):
+    """周度总结：过去 7 天训练回顾和下周训练方向建议。"""
+    if not db:
+        raise HTTPException(status_code=500, detail="数据库不可用")
+    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    if not credential:
+        raise HTTPException(status_code=404, detail="Garmin 未绑定")
+    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    dt = date.fromisoformat(target_date) if target_date else date.today()
+    try:
+        result = service.build_weekly_summary(db, user.id, dt)
+        return result
+    except Exception as e:
+        logger.error(f"周度总结生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"周度总结生成失败: {str(e)}")
 
 
 if __name__ == "__main__":

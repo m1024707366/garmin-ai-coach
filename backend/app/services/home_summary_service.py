@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.crud import get_daily_summary_by_date, get_garmin_credential
 from backend.app.db.models import Activity, GarminDailySummary, WechatUser, User
-from backend.app.services.gemini_service import GeminiService
+from backend.app.services.llm_factory import get_llm_service
 from src.core.config import settings
 
 
@@ -196,17 +196,21 @@ def _calculate_readiness_score(
 
 
 class HomeSummaryService:
-    def __init__(self, *, gemini: Optional[GeminiService] = None) -> None:
-        self.gemini = gemini or GeminiService()
+    def __init__(self, *, llm=None) -> None:
+        self.gemini = llm or get_llm_service()
 
     def should_generate_ai_brief(self, *, run_count: int, sleep_days: int) -> bool:
         if run_count < 3 or sleep_days < 3:
             logger.info("[HomeSummary] Insufficient data; skip AI brief")
             return False
 
-        gemini_key = settings.GEMINI_API_KEY
-        if not gemini_key or not gemini_key.strip():
-            logger.info("[HomeSummary] Gemini API key missing; skip AI brief")
+        provider = settings.LLM_PROVIDER.lower()
+        if provider == "deepseek":
+            key = getattr(settings, 'DEEPSEEK_API_KEY', None)
+        else:
+            key = getattr(settings, 'GEMINI_API_KEY', None)
+        if not key or not key.strip():
+            logger.info(f"[HomeSummary] {provider} API key missing; skip AI brief")
             return False
         return True
 

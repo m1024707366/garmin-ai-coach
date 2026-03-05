@@ -49,6 +49,18 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    coach_memories: Mapped[list["CoachMemory"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    injury_logs: Mapped[list["InjuryLog"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    weekly_reports: Mapped[list["WeeklyReport"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
 
 
 class WechatUser(Base):
@@ -433,3 +445,118 @@ class ChatMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     wechat_user: Mapped[WechatUser] = relationship(back_populates="chat_messages")
+
+
+class CoachMemory(Base):
+    """运动员档案（教练记忆）"""
+    __tablename__ = "coach_memories"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_coach_memory_user"),
+        {"mysql_charset": "utf8mb4"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # 目标赛事
+    target_race: Mapped[Optional[str]] = mapped_column(String(255))  # 例: "2026上海马拉松"
+    target_race_date: Mapped[Optional[date]] = mapped_column(Date)
+    target_race_distance_km: Mapped[Optional[float]] = mapped_column(Float)  # 例: 42.195
+
+    # 个人最佳
+    pb_5k_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    pb_10k_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    pb_half_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+    pb_full_seconds: Mapped[Optional[int]] = mapped_column(Integer)
+
+    # 训练目标
+    weekly_mileage_goal_km: Mapped[Optional[float]] = mapped_column(Float)  # 周跑量目标
+    target_finish_time_seconds: Mapped[Optional[int]] = mapped_column(Integer)  # 目标完赛时间
+
+    # 自由备注（教练可补充）
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    # 生理指标
+    max_hr: Mapped[Optional[int]] = mapped_column(Integer)  # 最大心率
+    rest_hr: Mapped[Optional[int]] = mapped_column(Integer)  # 静息心率
+    vo2max: Mapped[Optional[float]] = mapped_column(Float)  # 最大摄氧量
+    lthr: Mapped[Optional[int]] = mapped_column(Integer)  # 乳酸阈心率
+    ftp: Mapped[Optional[int]] = mapped_column(Integer)  # 功能性阈值功率
+
+    # 扩展信息
+    injury_history: Mapped[Optional[str]] = mapped_column(Text)  # 历史伤病
+    training_preference: Mapped[Optional[str]] = mapped_column(Text)  # 训练偏好
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="coach_memories")
+
+
+class InjuryLog(Base):
+    """伤病日志"""
+    __tablename__ = "injury_logs"
+    __table_args__ = {"mysql_charset": "utf8mb4"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    log_date: Mapped[date] = mapped_column(Date, nullable=False)
+    body_part: Mapped[str] = mapped_column(String(64), nullable=False)  # 例: "左膝", "右跟腱"
+    injury_type: Mapped[Optional[str]] = mapped_column(String(64))  # 伤病类型，例: "疲劳性骨折"
+    pain_level: Mapped[int] = mapped_column(Integer, nullable=False)  # 0-10
+    description: Mapped[Optional[str]] = mapped_column(Text)  # 详细描述
+    is_resolved: Mapped[bool] = mapped_column(Integer, nullable=False, default=0)  # 是否已恢复
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="injury_logs")
+
+
+class WeeklyReport(Base):
+    """周度总结报告"""
+    __tablename__ = "weekly_reports"
+    __table_args__ = (
+        UniqueConstraint("user_id", "week_start_date", name="uq_weekly_report_user_week"),
+        {"mysql_charset": "utf8mb4"},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    week_start_date: Mapped[date] = mapped_column(Date, nullable=False)  # 周一日期
+    week_end_date: Mapped[date] = mapped_column(Date, nullable=False)  # 周日日期
+
+    # 统计指标
+    total_distance_km: Mapped[Optional[float]] = mapped_column(Float)
+    total_duration_seconds: Mapped[Optional[float]] = mapped_column(Float)
+    run_count: Mapped[Optional[int]] = mapped_column(Integer)
+    avg_pace_seconds: Mapped[Optional[float]] = mapped_column(Float)  # 均配（秒/公里）
+
+    # 负荷与信心
+    acwr: Mapped[Optional[float]] = mapped_column(Float)  # 急慢性负荷比
+    confidence_score: Mapped[Optional[float]] = mapped_column(Float)  # 比赛信心评分 0-100
+
+    # AI 总结
+    ai_summary: Mapped[Optional[str]] = mapped_column(LONGTEXT)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    user: Mapped[User] = relationship(back_populates="weekly_reports")

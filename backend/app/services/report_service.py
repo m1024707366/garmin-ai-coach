@@ -24,7 +24,7 @@ from backend.app.db.crud import (
 )
 from backend.app.services.data_processor import DataProcessor
 from backend.app.services.garmin_client import GarminClient
-from backend.app.services.gemini_service import GeminiService
+from backend.app.services.llm_factory import get_llm_service
 from backend.app.utils.crypto import decrypt_text
 from src.core.config import settings
 from src.services.garmin_service import GarminService
@@ -38,10 +38,10 @@ class ReportService:
         self,
         *,
         processor: Optional[DataProcessor] = None,
-        gemini: Optional[GeminiService] = None,
+        llm=None,
     ) -> None:
         self.processor = processor or DataProcessor()
-        self.gemini = gemini or GeminiService()
+        self.gemini = llm or get_llm_service()
 
     def build_daily_analysis(
         self,

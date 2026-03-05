@@ -117,3 +117,136 @@ export type ChatMessage = {
 export type ChatHistoryResponse = {
   messages: ChatMessage[]
 }
+
+// ==================== T4: 晨间报告 ====================
+export type MorningReportResponse = {
+  target_date: string
+  sleep_summary: {
+    duration_hours: number | null
+    score: number | null
+    deep_sleep_hours: number | null
+  } | null
+  training_load: {
+    acwr: number | null
+    acwr_status: string | null
+    acute_load: number | null
+    chronic_load: number | null
+  } | null
+  readiness: ReadinessScore | null
+  ai_morning_advice: string
+}
+
+// ==================== T5: 晚间复盘 ====================
+export type EveningReviewResponse = {
+  target_date: string
+  today_activities: Array<{
+    type: string
+    distance_km: number | null
+    duration_min: number | null
+    avg_hr: number | null
+    avg_pace: string | null
+    trimp: number | null
+  }>
+  recovery_metrics: {
+    stress_avg: number | null
+    body_battery_end: number | null
+    resting_hr: number | null
+  } | null
+  ai_evening_review: string
+}
+
+// ==================== T6: 周度总结 ====================
+export type WeeklySummaryResponse = {
+  target_date: string
+  week_start: string
+  week_end: string
+  weekly_stats: {
+    total_distance_km: number
+    run_count: number
+    total_duration_min: number
+    avg_pace: string | null
+    avg_hr: number | null
+  } | null
+  load_trend: {
+    acwr: number | null
+    acwr_status: string | null
+    weekly_trimp: number | null
+  } | null
+  confidence_score: {
+    score: number
+    label: string
+    factors: Array<{
+      name: string
+      score: number
+      detail: string
+    }>
+  } | null
+  ai_weekly_summary: string
+}
+
+// ==================== T7: 伤病记录 ====================
+export type InjuryLog = {
+  id: number
+  body_part: string
+  injury_type: string | null
+  severity: number
+  description: string | null
+  occurred_date: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type InjuryLogCreateRequest = {
+  body_part: string
+  injury_type?: string
+  severity: number
+  description?: string
+  occurred_date?: string
+}
+
+export type InjuryLogUpdateRequest = {
+  severity?: number
+  description?: string
+  is_active?: boolean
+}
+
+// ==================== T8: 教练记忆（运动员档案） ====================
+export type CoachProfileResponse = {
+  user_id: number
+  max_hr: number | null
+  rest_hr: number | null
+  vo2max: number | null
+  lthr: number | null
+  ftp: number | null
+  injury_history: string | null
+  training_preference: string | null
+  race_target: string | null
+  race_date: string | null
+  pb_5k_seconds: number | null
+  pb_10k_seconds: number | null
+  pb_half_seconds: number | null
+  pb_full_seconds: number | null
+  weekly_mileage_goal_km: number | null
+  target_finish_time_seconds: number | null
+  notes: string | null
+}
+
+export type CoachProfileUpdateRequest = {
+  max_hr?: number
+  rest_hr?: number
+  vo2max?: number
+  lthr?: number
+  ftp?: number
+  injury_history?: string
+  training_preference?: string
+  race_target?: string
+  race_date?: string
+  pb_5k_seconds?: number
+  pb_10k_seconds?: number
+  pb_half_seconds?: number
+  pb_full_seconds?: number
+  weekly_mileage_goal_km?: number
+  target_finish_time_seconds?: number
+  notes?: string
+}

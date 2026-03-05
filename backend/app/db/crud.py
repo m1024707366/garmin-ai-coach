@@ -15,16 +15,19 @@ from backend.app.db.models import (
     Activity,
     ActivityLap,
     ChatMessage,
+    CoachMemory,
     DailyAnalysis,
     GarminDailySummary,
     GarminCredential,
     HomeSummary,
+    InjuryLog,
     NotificationLog,
     SyncState,
     TrainingPlan,
     User,
     UserProfile,
     WechatUser,
+    WeeklyReport,
 )
 
 
@@ -645,4 +648,240 @@ def add_chat_message(
         context_json=context_json,
     )
     db.add(row)
+    return row
+
+
+# ---------------------------------------------------------------------------
+# CoachMemory（运动员档案 / 教练记忆）
+# ---------------------------------------------------------------------------
+
+def get_coach_memory(db: Session, *, user_id: int) -> Optional[CoachMemory]:
+    """获取用户的教练记忆档案（每用户至多一条）"""
+    return (
+        db.query(CoachMemory)
+        .filter(CoachMemory.user_id == user_id)
+        .one_or_none()
+    )
+
+
+def upsert_coach_memory(
+    db: Session,
+    *,
+    user_id: int,
+    target_race: Optional[str] = None,
+    target_race_date: Optional[date] = None,
+    target_race_distance_km: Optional[float] = None,
+    pb_5k_seconds: Optional[int] = None,
+    pb_10k_seconds: Optional[int] = None,
+    pb_half_seconds: Optional[int] = None,
+    pb_full_seconds: Optional[int] = None,
+    weekly_mileage_goal_km: Optional[float] = None,
+    target_finish_time_seconds: Optional[int] = None,
+    notes: Optional[str] = None,
+    max_hr: Optional[int] = None,
+    rest_hr: Optional[int] = None,
+    vo2max: Optional[float] = None,
+    lthr: Optional[int] = None,
+    ftp: Optional[int] = None,
+    injury_history: Optional[str] = None,
+    training_preference: Optional[str] = None,
+) -> CoachMemory:
+    """创建或更新教练记忆档案（传入的字段会被设置，未传入的保持原值）"""
+    existing = (
+        db.query(CoachMemory)
+        .filter(CoachMemory.user_id == user_id)
+        .one_or_none()
+    )
+
+    fields: dict[str, Any] = {
+        "target_race": target_race,
+        "target_race_date": target_race_date,
+        "target_race_distance_km": target_race_distance_km,
+        "pb_5k_seconds": pb_5k_seconds,
+        "pb_10k_seconds": pb_10k_seconds,
+        "pb_half_seconds": pb_half_seconds,
+        "pb_full_seconds": pb_full_seconds,
+        "weekly_mileage_goal_km": weekly_mileage_goal_km,
+        "target_finish_time_seconds": target_finish_time_seconds,
+        "notes": notes,
+        "max_hr": max_hr,
+        "rest_hr": rest_hr,
+        "vo2max": vo2max,
+        "lthr": lthr,
+        "ftp": ftp,
+        "injury_history": injury_history,
+        "training_preference": training_preference,
+    }
+
+    if existing:
+        for k, v in fields.items():
+            if v is not None:
+                setattr(existing, k, v)
+        return existing
+
+    row = CoachMemory(user_id=user_id, **{k: v for k, v in fields.items() if v is not None})
+    db.add(row)
+    db.flush()
+    return row
+
+
+# ---------------------------------------------------------------------------
+# InjuryLog（伤病日志）
+# ---------------------------------------------------------------------------
+
+def get_injury_logs(
+    db: Session,
+    *,
+    user_id: int,
+    only_active: bool = False,
+    limit: int = 30,
+) -> list[InjuryLog]:
+    """获取用户伤病日志列表"""
+    q = db.query(InjuryLog).filter(InjuryLog.user_id == user_id)
+    if only_active:
+        q = q.filter(InjuryLog.is_resolved == 0)
+    return q.order_by(InjuryLog.log_date.desc(), InjuryLog.id.desc()).limit(limit).all()
+
+
+def create_injury_log(
+    db: Session,
+    *,
+    user_id: int,
+    log_date: date,
+    body_part: str,
+    pain_level: int,
+    description: Optional[str] = None,
+    is_resolved: int = 0,
+    injury_type: Optional[str] = None,
+) -> InjuryLog:
+    """新增一条伤病日志"""
+    row = InjuryLog(
+        user_id=user_id,
+        log_date=log_date,
+        body_part=body_part,
+        pain_level=pain_level,
+        description=description,
+        is_resolved=is_resolved,
+        injury_type=injury_type,
+    )
+    db.add(row)
+    db.flush()
+    return row
+
+
+def update_injury_log(
+    db: Session,
+    *,
+    log_id: int,
+    user_id: int,
+    body_part: Optional[str] = None,
+    pain_level: Optional[int] = None,
+    description: Optional[str] = None,
+    is_resolved: Optional[int] = None,
+    injury_type: Optional[str] = None,
+) -> Optional[InjuryLog]:
+    """更新伤病日志（仅更新非 None 的字段）"""
+    existing = (
+        db.query(InjuryLog)
+        .filter(InjuryLog.id == log_id)
+        .filter(InjuryLog.user_id == user_id)
+        .one_or_none()
+    )
+    if existing is None:
+        return None
+
+    if body_part is not None:
+        existing.body_part = body_part
+    if pain_level is not None:
+        existing.pain_level = pain_level
+    if description is not None:
+        existing.description = description
+    if is_resolved is not None:
+        existing.is_resolved = is_resolved
+    if injury_type is not None:
+        existing.injury_type = injury_type
+    return existing
+
+
+# ---------------------------------------------------------------------------
+# WeeklyReport（周度总结）
+# ---------------------------------------------------------------------------
+
+def get_weekly_report(
+    db: Session,
+    *,
+    user_id: int,
+    week_start_date: date,
+) -> Optional[WeeklyReport]:
+    """获取指定周的周报"""
+    return (
+        db.query(WeeklyReport)
+        .filter(WeeklyReport.user_id == user_id)
+        .filter(WeeklyReport.week_start_date == week_start_date)
+        .one_or_none()
+    )
+
+
+def get_recent_weekly_reports(
+    db: Session,
+    *,
+    user_id: int,
+    limit: int = 8,
+) -> list[WeeklyReport]:
+    """获取最近 N 周的周报"""
+    return (
+        db.query(WeeklyReport)
+        .filter(WeeklyReport.user_id == user_id)
+        .order_by(WeeklyReport.week_start_date.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def upsert_weekly_report(
+    db: Session,
+    *,
+    user_id: int,
+    week_start_date: date,
+    week_end_date: date,
+    total_distance_km: Optional[float] = None,
+    total_duration_seconds: Optional[float] = None,
+    run_count: Optional[int] = None,
+    avg_pace_seconds: Optional[float] = None,
+    acwr: Optional[float] = None,
+    confidence_score: Optional[float] = None,
+    ai_summary: Optional[str] = None,
+) -> WeeklyReport:
+    """创建或更新周报"""
+    existing = (
+        db.query(WeeklyReport)
+        .filter(WeeklyReport.user_id == user_id)
+        .filter(WeeklyReport.week_start_date == week_start_date)
+        .one_or_none()
+    )
+
+    fields: dict[str, Any] = {
+        "week_end_date": week_end_date,
+        "total_distance_km": total_distance_km,
+        "total_duration_seconds": total_duration_seconds,
+        "run_count": run_count,
+        "avg_pace_seconds": avg_pace_seconds,
+        "acwr": acwr,
+        "confidence_score": confidence_score,
+        "ai_summary": ai_summary,
+    }
+
+    if existing:
+        for k, v in fields.items():
+            if v is not None:
+                setattr(existing, k, v)
+        return existing
+
+    row = WeeklyReport(
+        user_id=user_id,
+        week_start_date=week_start_date,
+        **{k: v for k, v in fields.items() if v is not None},
+    )
+    db.add(row)
+    db.flush()
     return row
