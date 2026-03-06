@@ -85,6 +85,9 @@ class CoachReportService:
                 "duration_hours": round(sleep_data.sleep_time_hours, 1) if sleep_data.sleep_time_hours else None,
                 "score": sleep_data.sleep_score,
                 "deep_sleep_hours": deep_sleep_hours,
+                "body_battery": sleep_data.body_battery,
+                "resting_hr": sleep_data.resting_heart_rate,
+                "hrv_status": sleep_data.hrv_status,
             }
 
         # 2. ACWR 计算
@@ -182,8 +185,8 @@ class CoachReportService:
         """组装晨间报告的提示词。"""
         # 格式化睡眠
         sleep_text = "无睡眠数据"
-        if sleep_info.get("hours"):
-            sleep_text = f"睡眠 {sleep_info['hours']}h"
+        if sleep_info and sleep_info.get("duration_hours"):
+            sleep_text = f"睡眠 {sleep_info['duration_hours']}h"
             if sleep_info.get("score"):
                 sleep_text += f"，睡眠分数 {sleep_info['score']}"
             if sleep_info.get("body_battery"):
@@ -206,8 +209,8 @@ class CoachReportService:
 === 今日状态 ===
 日期：{target_date}
 睡眠：{sleep_text}
-静息心率：{sleep_info.get('resting_hr', '-')} bpm
-HRV状态：{sleep_info.get('hrv_status', '-')}
+静息心率：{sleep_info.get('resting_hr', '-') if sleep_info else '-'} bpm
+HRV状态：{sleep_info.get('hrv_status', '-') if sleep_info else '-'}
 
 === 训练负荷 ===
 ACWR：{acwr['acwr']:.2f}（{acwr['zone_label']}）
@@ -287,6 +290,15 @@ ACWR：{acwr['acwr']:.2f}（{acwr['zone_label']}）
                 "resting_hr": health_data.resting_heart_rate,
             }
 
+        # 构造 health_info 供 _build_evening_prompt 使用
+        health_info: dict[str, Any] = {}
+        if health_data:
+            health_info = {
+                "body_battery": health_data.body_battery,
+                "resting_hr": health_data.resting_heart_rate,
+                "stress_level": health_data.average_stress_level,
+                "hrv_status": health_data.hrv_status,
+            }
         # 3. ACWR 计算
         acwr_data = calculate_acwr(db, user_id=user_id, target_date=target_date)
 
