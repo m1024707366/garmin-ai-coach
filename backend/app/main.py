@@ -28,19 +28,28 @@ from pydantic import BaseModel
 
 from sqlalchemy.orm import Session
 
-from backend.app.api.wechat import router as wechat_router
-from backend.app.deps.auth import get_current_wechat_user
-from backend.app.services.garmin_client import GarminClient
+
 from backend.app.services.data_processor import DataProcessor
 from backend.app.services.llm_factory import get_llm_service
 from backend.app.services.home_summary_service import HomeSummaryService
 from backend.app.services.report_service import ReportService
 from backend.app.services.coach_report_service import CoachReportService
-from backend.app.jobs.scheduler import start_scheduler
+
+# 仅在非mock模式下导入GarminClient和scheduler
+USE_MOCK_MODE = True
+GarminClient = None
+start_scheduler = None
+if not USE_MOCK_MODE:
+    from backend.app.services.garmin_client import GarminClient
+    from backend.app.jobs.scheduler import start_scheduler
 from backend.app.db.crud import get_home_summary, upsert_home_summary, get_garmin_credential, get_coach_memory, upsert_coach_memory, get_injury_logs, create_injury_log, update_injury_log
 from backend.app.db.models import WechatUser, User
 from backend.app.db.session import get_db_optional, init_db
-from src.services.garmin_service import GarminService
+
+# 仅在非mock模式下导入GarminService
+GarminService = None
+if not USE_MOCK_MODE:
+    from src.services.garmin_service import GarminService
 from src.core.config import settings
 
 
@@ -51,7 +60,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.include_router(wechat_router)
+
 
 _scheduler = None
 
@@ -121,8 +130,7 @@ class PeriodAnalysisResponse(BaseModel):
     ai_analysis: Optional[str] = None
 
 
-# Mock Mode 开关（通过 .env 配置）
-USE_MOCK_MODE = settings.USE_MOCK_MODE
+
 
 # 依赖注入：初始化服务实例
 def get_garmin_client() -> Optional[GarminClient]:
@@ -353,23 +361,24 @@ async def health_check():
 @app.get("/api/coach/home-summary", response_model=HomeSummaryResponse)
 async def get_home_summary_endpoint(
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     home_summary_service: HomeSummaryService = Depends(get_home_summary_service),
 ):
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    cached = get_home_summary(db, wechat_user_id=current_user.id)
+    # 暂时使用固定的用户 ID，实际生产环境需要实现用户认证
+    wechat_user_id = 1
+    cached = get_home_summary(db, wechat_user_id=wechat_user_id)
     try:
         summary = home_summary_service.build_summary(
             db=db,
-            wechat_user_id=current_user.id,
+            wechat_user_id=wechat_user_id,
             include_ai_brief=False,
         )
 
         upsert_home_summary(
             db,
-            wechat_user_id=current_user.id,
+            wechat_user_id=wechat_user_id,
             latest_run_json=summary.get("latest_run"),
             week_stats_json=summary.get("week_stats"),
             month_stats_json=summary.get("month_stats"),
@@ -402,7 +411,6 @@ async def get_home_summary_endpoint(
 async def get_period_analysis(
     period: str,  # "week" or "month"
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     llm=Depends(get_llm),
 ):
     if not db:
@@ -424,7 +432,7 @@ async def get_period_analysis(
     from backend.app.db.models import Activity, GarminDailySummary
     from sqlalchemy import func
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
 
@@ -541,12 +549,11 @@ async def get_daily_analysis(
     target_date: Optional[str] = None,
     force_refresh: bool = False,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     report_service: ReportService = Depends(get_report_service),
 ):
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    wechat_user_id = current_user.id
+    wechat_user_id = 1
     """
     获取每日训练分析和 AI 教练建议。
     
@@ -650,13 +657,12 @@ class CoachProfileRequest(BaseModel):
 async def create_injury_log_endpoint(
     req: InjuryLogCreateRequest,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """新增伤病日志"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -703,13 +709,12 @@ async def get_injury_logs_endpoint(
     only_active: bool = False,
     limit: int = 30,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """获取伤病日志列表"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -738,13 +743,12 @@ async def update_injury_log_endpoint(
     log_id: int,
     req: InjuryLogUpdateRequest,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """更新伤病日志"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -791,13 +795,12 @@ async def update_injury_log_endpoint(
 @app.get("/api/coach/profile")
 async def get_coach_profile_endpoint(
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """获取运动员档案"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -851,13 +854,12 @@ async def get_coach_profile_endpoint(
 async def update_coach_profile_endpoint(
     req: CoachProfileRequest,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """创建或更新运动员档案"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -921,13 +923,12 @@ async def update_coach_profile_endpoint(
 async def morning_report_endpoint(
     target_date: Optional[str] = None,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     service: CoachReportService = Depends(get_coach_report_service),
 ):
     """晨间报告：基于昨晚睡眠和近期训练负荷，给出今日训练建议。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -948,13 +949,12 @@ async def morning_report_endpoint(
 async def evening_review_endpoint(
     target_date: Optional[str] = None,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     service: CoachReportService = Depends(get_coach_report_service),
 ):
     """晚间复盘：基于今日训练数据，给出恢复建议和明日展望。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -975,13 +975,12 @@ async def evening_review_endpoint(
 async def weekly_summary_endpoint(
     target_date: Optional[str] = None,
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
     service: CoachReportService = Depends(get_coach_report_service),
 ):
     """周度总结：过去 7 天训练回顾和下周训练方向建议。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定")
     user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
@@ -1001,7 +1000,6 @@ async def weekly_summary_endpoint(
 @app.post("/api/coach/sync-garmin-profile")
 async def sync_garmin_profile_endpoint(
     db: Optional[Session] = Depends(get_db_optional),
-    current_user: WechatUser = Depends(get_current_wechat_user),
 ):
     """从 Garmin 同步用户体能数据到运动员档案（max_hr, rest_hr, vo2max, PB）。"""
     from backend.app.utils.crypto import decrypt_text
@@ -1009,7 +1007,7 @@ async def sync_garmin_profile_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=current_user.id)
+    credential = get_garmin_credential(db, wechat_user_id=1)
     if not credential:
         raise HTTPException(status_code=404, detail="Garmin 未绑定，请先绑定 Garmin 账号")
 
@@ -1064,7 +1062,7 @@ async def sync_garmin_profile_endpoint(
 
     # 写入 coach_memory
     try:
-        upsert_coach_memory(db, wechat_user_id=current_user.id, **synced_fields)
+        upsert_coach_memory(db, wechat_user_id=1, **synced_fields)
     except Exception as e:
         logger.error(f"Coach memory 更新失败: {e}")
         raise HTTPException(status_code=500, detail=f"数据保存失败: {str(e)}")

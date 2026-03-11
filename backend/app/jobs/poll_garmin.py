@@ -8,15 +8,12 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.crud import (
     get_or_create_sync_state,
-    has_notification_sent,
-    log_notification,
     get_garmin_credential,
     upsert_home_summary,
 )
 from backend.app.db.models import WechatUser
 from backend.app.services.home_summary_service import HomeSummaryService
 from backend.app.services.report_service import ReportService
-from backend.app.services.wechat_service import WechatService
 
 
 logger = logging.getLogger(__name__)
@@ -63,7 +60,6 @@ def poll_garmin_for_user(
     wechat_user: WechatUser,
     report_service: ReportService,
     home_summary_service: HomeSummaryService,
-    wechat_service: WechatService,
 ) -> None:
     credential = get_garmin_credential(db, wechat_user_id=wechat_user.id)
     if credential is None:
@@ -113,50 +109,12 @@ def poll_garmin_for_user(
     sync_state.last_poll_at = datetime.utcnow()
     db.commit()
 
-    event_key = f"daily:{analysis_date}"
-    if has_notification_sent(
-        db,
-        wechat_user_id=wechat_user.id,
-        event_type="daily_report",
-        event_key=event_key,
-    ):
-        logger.info(f"[Poll] notification already sent, skip: user={wechat_user.id}, key={event_key}")
-        return
-
-    try:
-        summary = result.get("ai_advice") or "报告已生成"
-        wechat_service.send_subscribe_message(
-            openid=wechat_user.openid,
-            data=build_template_data(analysis_date, summary[:30]),
-        )
-        log_notification(
-            db,
-            wechat_user_id=wechat_user.id,
-            event_type="daily_report",
-            event_key=event_key,
-            status="sent",
-        )
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        log_notification(
-            db,
-            wechat_user_id=wechat_user.id,
-            event_type="daily_report",
-            event_key=event_key,
-            status="error",
-            error_message=str(e),
-        )
-        db.commit()
-        logger.warning(f"[Poll] failed to send message: {e}")
-
     _ = result
 
 
 def poll_garmin(db: Session) -> None:
     report_service = ReportService()
     home_summary_service = HomeSummaryService()
-    wechat_service = WechatService()
 
     users = db.query(WechatUser).all()
     for user in users:
@@ -166,7 +124,6 @@ def poll_garmin(db: Session) -> None:
                 wechat_user=user,
                 report_service=report_service,
                 home_summary_service=home_summary_service,
-                wechat_service=wechat_service,
             )
         except Exception as e:
             logger.warning(f"[Poll] failed for user {user.id}: {e}")

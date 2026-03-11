@@ -23,11 +23,18 @@ from backend.app.db.crud import (
     upsert_user_profile,
 )
 from backend.app.services.data_processor import DataProcessor
-from backend.app.services.garmin_client import GarminClient
 from backend.app.services.llm_factory import get_llm_service
-from backend.app.utils.crypto import decrypt_text
+
+# 仅在非mock模式下导入GarminClient
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from src.core.config import settings
-from src.services.garmin_service import GarminService
+
+GarminClient = None
+if not settings.USE_MOCK_MODE:
+    from backend.app.services.garmin_client import GarminClient
+from backend.app.utils.crypto import decrypt_text
 
 
 logger = logging.getLogger(__name__)
@@ -124,15 +131,85 @@ class ReportService:
 
         if data_source != "db":
             if settings.USE_MOCK_MODE:
-                from backend.app.services.garmin_client import GarminClient as GC
-
-                mock_client = GC.__new__(GC)
-                mock_client.email = settings.GARMIN_EMAIL
-                mock_client.password = settings.GARMIN_PASSWORD
-                mock_client.is_cn = settings.GARMIN_IS_CN
-                mock_client.client = None
-
-                mock_activity, mock_health, mock_plan = mock_client.get_mock_data(analysis_date)
+                # 直接实现mock数据获取，避免导入GarminClient
+                from datetime import datetime, timedelta
+                import json
+                import os
+                
+                # 尝试从mock文件读取数据
+                def get_mock_data(target_date):
+                    # 首先尝试从 backend/app/data/mock_garmin.json 读取
+                    current_dir = os.path.dirname(os.path.abspath(__file__))
+                    mock_file = os.path.join(current_dir, "..", "data", "mock_garmin.json")
+                    
+                    # 如果文件不存在，尝试相对路径
+                    if not os.path.exists(mock_file):
+                        mock_file = os.path.join(current_dir, "..", "..", "..", "backend", "app", "data", "mock_garmin.json")
+                    
+                    mock_data = None
+                    target_day = None
+                    
+                    # 尝试读取 mock_garmin.json
+                    if os.path.exists(mock_file):
+                        try:
+                            with open(mock_file, "r", encoding="utf-8") as f:
+                                mock_data = json.load(f)
+                            # 在 days 数组中查找匹配的日期
+                            days = mock_data.get("days", [])
+                            for day in days:
+                                if day.get("date") == target_date:
+                                    target_day = day
+                                    break
+                        except Exception as e:
+                            pass
+                    
+                    if not target_day:
+                        # 如果找不到指定日期，返回默认数据
+                        return None, None, []
+                    
+                    # 提取活动数据（第一个活动）
+                    activity = None
+                    activities = target_day.get("activities", [])
+                    if activities and len(activities) > 0:
+                        activity = activities[0]  # 使用第一个活动
+                    
+                    # 构造健康数据
+                    health = {
+                        "date": target_date,
+                        "sleep_time_seconds": 28800,  # 8小时
+                        "sleep_time_hours": 8.0,
+                        "sleep_score": 85,
+                        "deep_sleep_seconds": 7200,  # 2小时
+                        "deep_sleep_hh_mm": "2:00",
+                        "rem_sleep_seconds": 3600,  # 1小时
+                        "rem_sleep_hh_mm": "1:00",
+                        "light_sleep_seconds": 14400,  # 4小时
+                        "light_sleep_hh_mm": "4:00",
+                        "awake_sleep_seconds": 3600,  # 1小时
+                        "awake_sleep_hh_mm": "1:00",
+                        "resting_heart_rate": 65,
+                        "body_battery": 60,
+                        "average_stress_level": 35,
+                        "stress_qualifier": "BALANCED"
+                    }
+                    
+                    # 训练计划（返回简单的模拟计划）
+                    plan = [
+                        {
+                            "date": (datetime.strptime(target_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d"),
+                            "workoutName": "轻松跑 40分钟",
+                            "description": "恢复性训练",
+                        },
+                        {
+                            "date": (datetime.strptime(target_date, "%Y-%m-%d") + timedelta(days=2)).strftime("%Y-%m-%d"),
+                            "workoutName": "休息日",
+                            "description": "",
+                        },
+                    ]
+                    
+                    return activity, health, plan
+                
+                mock_activity, mock_health, mock_plan = get_mock_data(analysis_date)
                 raw_health = mock_health
                 raw_plan = mock_plan or []
                 if mock_activity:
@@ -141,6 +218,10 @@ class ReportService:
             else:
                 if credential is None:
                     raise HTTPException(status_code=403, detail="请先绑定 Garmin 账号")
+
+                # 确保在非mock模式下才导入和使用GarminService和GarminClient
+                from backend.app.services.garmin_client import GarminClient
+                from src.services.garmin_service import GarminService
 
                 garmin_password = decrypt_text(credential.garmin_password)
                 garmin_client = GarminClient(
@@ -317,6 +398,10 @@ class ReportService:
         garmin_password = decrypt_text(credential.garmin_password)
         user = get_or_create_user(db, garmin_email=credential.garmin_email)
         db_user_id = user.id
+
+        # 确保在非mock模式下才导入和使用GarminService和GarminClient
+        from backend.app.services.garmin_client import GarminClient
+        from src.services.garmin_service import GarminService
 
         garmin_client = GarminClient(
             email=credential.garmin_email,

@@ -550,5 +550,3 @@ class GarminClient:
             result["race_predictions_error"] = str(e)
 
         return result
-        
-        return activity, health, plan

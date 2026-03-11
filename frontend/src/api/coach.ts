@@ -85,43 +85,41 @@ export const coachApi = {
   /**
    * 绑定 Garmin 账号
    */
-  bindGarmin: async (payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
-    const response = await apiClient.post('/api/wechat/bind-garmin', payload)
-    return response.data
+  bindGarmin: async (_payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
+    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    return { bound: true }
   },
 
   /**
    * 解绑 Garmin 账号
    */
   unbindGarmin: async () => {
-    const response = await apiClient.post('/api/wechat/unbind-garmin')
-    return response.data
+    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    return { bound: false }
   },
 
   /**
    * 获取用户信息
    */
   getProfile: async () => {
-    const response = await apiClient.get('/api/wechat/profile')
-    return response.data
+    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    return { has_binding: false }
   },
 
   /**
    * 聊天
    */
-  chat: async (payload: { message: string }) => {
-    const response = await apiClient.post('/api/wechat/chat', payload)
-    return response.data
+  chat: async (_payload: { message: string }) => {
+    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    return { reply: '这是一个模拟的回复' }
   },
 
   /**
    * 获取聊天历史
    */
-  getChatHistory: async (limit: number = 20) => {
-    const response = await apiClient.get('/api/wechat/chat/history', {
-      params: { limit }
-    })
-    return response.data
+  getChatHistory: async (_limit: number = 20) => {
+    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    return { messages: [] }
   },
 
   /**
