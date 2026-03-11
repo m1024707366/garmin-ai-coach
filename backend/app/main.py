@@ -32,24 +32,37 @@ from sqlalchemy.orm import Session
 from backend.app.services.data_processor import DataProcessor
 from backend.app.services.llm_factory import get_llm_service
 from backend.app.services.home_summary_service import HomeSummaryService
-from backend.app.services.report_service import ReportService
 from backend.app.services.coach_report_service import CoachReportService
 
-# 仅在非mock模式下导入GarminClient和scheduler
-USE_MOCK_MODE = True
+# 仅在非mock模式下导入ReportService和Garmin相关模块
+USE_MOCK_MODE = True  # 启用mock模式，避免garth库的兼容性问题
 GarminClient = None
 start_scheduler = None
+GarminService = None
+ReportService = None
+
 if not USE_MOCK_MODE:
+    from backend.app.services.report_service import ReportService
     from backend.app.services.garmin_client import GarminClient
     from backend.app.jobs.scheduler import start_scheduler
+    from src.services.garmin_service import GarminService
+else:
+    # 在mock模式下，使用一个简单的ReportService替代品
+    class ReportService:
+        def __init__(self, processor=None, llm=None):
+            self.processor = processor
+            self.gemini = llm
+        def build_daily_analysis(self, wechat_user_id, analysis_date, force_refresh, db):
+            return {
+                "date": analysis_date,
+                "raw_data_summary": "## 📊 模拟数据\n\n**今天的跑步数据**\n- 距离: 5.0 km\n- 时间: 25:00\n- 配速: 5:00 / km\n- 平均心率: 140 bpm\n\n**睡眠数据**\n- 睡眠时长: 8.0 小时\n- 睡眠质量: 良好\n",
+                "ai_advice": "## 📊 分析结果\n\n**今天的训练表现良好**\n- 配速稳定，心率控制在合理范围内\n- 建议明天进行轻度恢复训练\n- 保持良好的睡眠习惯\n",
+                "charts": None
+            }
+
 from backend.app.db.crud import get_home_summary, upsert_home_summary, get_garmin_credential, get_coach_memory, upsert_coach_memory, get_injury_logs, create_injury_log, update_injury_log
 from backend.app.db.models import WechatUser, User
 from backend.app.db.session import get_db_optional, init_db
-
-# 仅在非mock模式下导入GarminService
-GarminService = None
-if not USE_MOCK_MODE:
-    from src.services.garmin_service import GarminService
 from src.core.config import settings
 
 
@@ -92,9 +105,14 @@ def _shutdown() -> None:
             _scheduler = None
 
 # CORS 中间件配置
+# 生产环境应该配置具体的域名，而不是使用通配符
+ALLOWED_ORIGINS = ["*"]  # 开发环境使用通配符
+# 生产环境示例：
+# ALLOWED_ORIGINS = ["https://your-domain.com", "https://www.your-domain.com"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 生产环境请配置具体的域名
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1002,6 +1020,9 @@ async def sync_garmin_profile_endpoint(
     db: Optional[Session] = Depends(get_db_optional),
 ):
     """从 Garmin 同步用户体能数据到运动员档案（max_hr, rest_hr, vo2max, PB）。"""
+    if settings.USE_MOCK_MODE:
+        raise HTTPException(status_code=503, detail="Mock 模式下不支持同步 Garmin 档案")
+
     from backend.app.utils.crypto import decrypt_text
 
     if not db:

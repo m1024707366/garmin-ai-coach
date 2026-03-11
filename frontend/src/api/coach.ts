@@ -85,8 +85,9 @@ export const coachApi = {
   /**
    * 绑定 Garmin 账号
    */
-  bindGarmin: async (_payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
-    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+  bindGarmin: async (payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
+    // 注意：后端暂未实现此 API，使用模拟数据
+    console.warn('Backend API not implemented: /api/coach/bind-garmin')
     return { bound: true }
   },
 
@@ -94,7 +95,8 @@ export const coachApi = {
    * 解绑 Garmin 账号
    */
   unbindGarmin: async () => {
-    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    // 注意：后端暂未实现此 API，使用模拟数据
+    console.warn('Backend API not implemented: /api/coach/unbind-garmin')
     return { bound: false }
   },
 
@@ -102,23 +104,26 @@ export const coachApi = {
    * 获取用户信息
    */
   getProfile: async () => {
-    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+    // 注意：后端暂未实现此 API，使用模拟数据
+    console.warn('Backend API not implemented: /api/coach/user-profile')
     return { has_binding: false }
   },
 
   /**
    * 聊天
    */
-  chat: async (_payload: { message: string }) => {
-    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+  chat: async (payload: { message: string }) => {
+    // 注意：后端暂未实现此 API，使用模拟数据
+    console.warn('Backend API not implemented: /api/coach/chat')
     return { reply: '这是一个模拟的回复' }
   },
 
   /**
    * 获取聊天历史
    */
-  getChatHistory: async (_limit: number = 20) => {
-    // 暂时使用模拟数据，实际生产环境需要实现用户认证
+  getChatHistory: async (limit: number = 20) => {
+    // 注意：后端暂未实现此 API，使用模拟数据
+    console.warn('Backend API not implemented: /api/coach/chat-history')
     return { messages: [] }
   },
 

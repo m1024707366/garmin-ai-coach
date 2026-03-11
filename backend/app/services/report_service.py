@@ -34,7 +34,9 @@ from src.core.config import settings
 GarminClient = None
 if not settings.USE_MOCK_MODE:
     from backend.app.services.garmin_client import GarminClient
-from backend.app.utils.crypto import decrypt_text
+# 仅在非mock模式下导入crypto模块
+if not settings.USE_MOCK_MODE:
+    from backend.app.utils.crypto import decrypt_text
 
 
 logger = logging.getLogger(__name__)
@@ -223,13 +225,14 @@ class ReportService:
                 from backend.app.services.garmin_client import GarminClient
                 from src.services.garmin_service import GarminService
 
-                garmin_password = decrypt_text(credential.garmin_password)
-                garmin_client = GarminClient(
-                    email=credential.garmin_email,
-                    password=garmin_password,
-                    is_cn=bool(credential.is_cn),
-                )
-                garmin_service = GarminService(credential.garmin_email, garmin_password)
+                if not settings.USE_MOCK_MODE:
+                    garmin_password = decrypt_text(credential.garmin_password)
+                    garmin_client = GarminClient(
+                        email=credential.garmin_email,
+                        password=garmin_password,
+                        is_cn=bool(credential.is_cn),
+                    )
+                    garmin_service = GarminService(credential.garmin_email, garmin_password)
 
                 try:
                     daily_data = garmin_service.get_daily_data(analysis_date)
@@ -384,6 +387,16 @@ class ReportService:
         if days <= 0:
             return {
                 "days_requested": 0,
+                "days_processed": 0,
+                "days_with_data": 0,
+                "days_failed": 0,
+                "activities_synced": 0,
+                "health_days_synced": 0,
+            }
+
+        if settings.USE_MOCK_MODE:
+            return {
+                "days_requested": int(days),
                 "days_processed": 0,
                 "days_with_data": 0,
                 "days_failed": 0,
