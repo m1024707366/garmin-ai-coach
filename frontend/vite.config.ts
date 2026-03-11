@@ -13,4 +13,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom'],
+          reactRouter: ['react-router-dom'],
+          axios: ['axios'],
+          reactQuery: ['@tanstack/react-query'],
+          recharts: ['recharts'],
+          markdown: ['react-markdown', 'remark-gfm'],
+          dateFns: ['date-fns'],
+          zustand: ['zustand'],
+          heroicons: ['@heroicons/react'],
+        },
+      },
+    },
+  },
 })

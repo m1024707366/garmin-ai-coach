@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { BoltIcon, ChartBarIcon, ClockIcon, HomeIcon } from '@heroicons/react/24/outline'
+import { BoltIcon, ChartBarIcon, ClockIcon, HomeIcon, MoonIcon, SunIcon, CalendarIcon, HeartIcon, UserIcon, ChatBubbleLeftIcon } from '@heroicons/react/24/outline'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -12,6 +12,12 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', label: '首页', icon: HomeIcon },
     { path: '/analysis', label: '分析', icon: ChartBarIcon },
     { path: '/history', label: '历史', icon: ClockIcon },
+    { path: '/morning-report', label: '晨间报告', icon: SunIcon },
+    { path: '/evening-review', label: '晚间复盘', icon: MoonIcon },
+    { path: '/weekly-summary', label: '周度总结', icon: CalendarIcon },
+    { path: '/injury-log', label: '伤病记录', icon: HeartIcon },
+    { path: '/profile', label: '运动员档案', icon: UserIcon },
+    { path: '/chat', label: 'AI 对话', icon: ChatBubbleLeftIcon },
   ]
 
   return (
@@ -29,7 +35,7 @@ export default function Layout({ children }: LayoutProps) {
                 <p className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Performance Console</p>
               </div>
             </div>
-            <nav className="flex space-x-4">
+            <nav className="flex flex-wrap gap-2">
               {navItems.map((item) => {
                 const Icon = item.icon
                 const isActive =

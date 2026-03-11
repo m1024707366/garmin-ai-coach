@@ -63,4 +63,141 @@ export const coachApi = {
     const response = await apiClient.get('/health')
     return response.data
   },
+
+  /**
+   * 获取首页摘要
+   */
+  getHomeSummary: async () => {
+    const response = await apiClient.get('/api/coach/home-summary')
+    return response.data
+  },
+
+  /**
+   * 获取周期分析
+   */
+  getPeriodAnalysis: async (period: string) => {
+    const response = await apiClient.get('/api/coach/period-analysis', {
+      params: { period }
+    })
+    return response.data
+  },
+
+  /**
+   * 绑定 Garmin 账号
+   */
+  bindGarmin: async (payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
+    const response = await apiClient.post('/api/wechat/bind-garmin', payload)
+    return response.data
+  },
+
+  /**
+   * 解绑 Garmin 账号
+   */
+  unbindGarmin: async () => {
+    const response = await apiClient.post('/api/wechat/unbind-garmin')
+    return response.data
+  },
+
+  /**
+   * 获取用户信息
+   */
+  getProfile: async () => {
+    const response = await apiClient.get('/api/wechat/profile')
+    return response.data
+  },
+
+  /**
+   * 聊天
+   */
+  chat: async (payload: { message: string }) => {
+    const response = await apiClient.post('/api/wechat/chat', payload)
+    return response.data
+  },
+
+  /**
+   * 获取聊天历史
+   */
+  getChatHistory: async (limit: number = 20) => {
+    const response = await apiClient.get('/api/wechat/chat/history', {
+      params: { limit }
+    })
+    return response.data
+  },
+
+  /**
+   * 获取晨间报告
+   */
+  getMorningReport: async (targetDate?: string) => {
+    const params = targetDate ? { target_date: targetDate } : undefined
+    const response = await apiClient.get('/api/coach/morning-report', { params })
+    return response.data
+  },
+
+  /**
+   * 获取晚间复盘
+   */
+  getEveningReview: async (targetDate?: string) => {
+    const params = targetDate ? { target_date: targetDate } : undefined
+    const response = await apiClient.get('/api/coach/evening-review', { params })
+    return response.data
+  },
+
+  /**
+   * 获取周度总结
+   */
+  getWeeklySummary: async (targetDate?: string) => {
+    const params = targetDate ? { target_date: targetDate } : undefined
+    const response = await apiClient.get('/api/coach/weekly-summary', { params })
+    return response.data
+  },
+
+  /**
+   * 获取伤病记录
+   */
+  getInjuryLogs: async (onlyActive: boolean = true) => {
+    const response = await apiClient.get('/api/coach/injury-log', {
+      params: { only_active: onlyActive }
+    })
+    return response.data
+  },
+
+  /**
+   * 创建伤病记录
+   */
+  createInjuryLog: async (payload: any) => {
+    const response = await apiClient.post('/api/coach/injury-log', payload)
+    return response.data
+  },
+
+  /**
+   * 更新伤病记录
+   */
+  updateInjuryLog: async (logId: number, payload: any) => {
+    const response = await apiClient.put(`/api/coach/injury-log/${logId}`, payload)
+    return response.data
+  },
+
+  /**
+   * 获取教练档案
+   */
+  getCoachProfile: async () => {
+    const response = await apiClient.get('/api/coach/profile')
+    return response.data
+  },
+
+  /**
+   * 更新教练档案
+   */
+  updateCoachProfile: async (payload: any) => {
+    const response = await apiClient.put('/api/coach/profile', payload)
+    return response.data
+  },
+
+  /**
+   * 同步 Garmin 档案
+   */
+  syncGarminProfile: async () => {
+    const response = await apiClient.post('/api/coach/sync-garmin-profile')
+    return response.data
+  },
 }

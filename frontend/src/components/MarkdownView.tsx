@@ -18,15 +18,9 @@ const markdownComponents: Components = {
   blockquote: ({ ...props }) => (
     <blockquote className="my-4 border-l-4 border-orange-400/80 pl-4 italic text-slate-600" {...props} />
   ),
-  code: ({ inline, ...props }) =>
-    inline ? (
-      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm font-mono text-slate-800" {...props} />
-    ) : (
-      <code
-        className="mb-4 block overflow-x-auto rounded-xl bg-slate-900 p-3 text-sm font-mono text-slate-100"
-        {...props}
-      />
-    ),
+  code: ({ ...props }) => (
+    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-sm font-mono text-slate-800" {...props} />
+  ),
 }
 
 export function MarkdownView({ content, className = '' }: MarkdownViewProps) {

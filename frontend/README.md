@@ -1,8 +1,32 @@
-# Garmin AI Coach - Web 前端
+# Garmin AI Coach 网页端
 
-基于 React + TypeScript + Vite 构建的 Garmin AI Coach 前端应用。
+这是 Garmin AI Coach 的网页端实现，基于 React + TypeScript + Tailwind CSS 构建，与小程序功能保持一致。
 
-## 🚀 快速开始
+## 功能特点
+
+- 首页概览：显示最近一次跑步、今日准备度、周/月统计和教练简评
+- 每日分析：查看详细的训练分析和 AI 建议
+- 历史记录：查看过去的训练记录
+- 晨间报告：基于睡眠和训练负荷的晨间建议
+- 晚间复盘：基于今日训练的晚间复盘和恢复建议
+- 周度总结：过去 7 天的训练回顾和下周建议
+- 伤病记录：记录和管理伤病情况
+- 运动员档案：管理个人训练数据和目标
+- AI 对话：与 AI 教练进行对话
+- Garmin 绑定：绑定/解绑 Garmin 账号，同步数据
+
+## 技术栈
+
+- React 18
+- TypeScript
+- Tailwind CSS
+- React Router
+- Axios
+- React Query
+- Recharts
+- React Markdown
+
+## 安装和运行
 
 ### 1. 安装依赖
 
@@ -13,15 +37,15 @@ npm install
 
 ### 2. 配置环境变量
 
-复制 `.env.example` 为 `.env`：
+复制 `.env.example` 文件为 `.env`，并根据需要修改配置：
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，设置 API 地址：
+默认配置：
 
-```bash
+```
 VITE_API_BASE_URL=http://localhost:8000
 ```
 
@@ -31,7 +55,7 @@ VITE_API_BASE_URL=http://localhost:8000
 npm run dev
 ```
 
-访问 http://localhost:5173
+开发服务器默认运行在 `http://localhost:5173`。
 
 ### 4. 构建生产版本
 
@@ -39,149 +63,154 @@ npm run dev
 npm run build
 ```
 
-构建产物在 `dist` 目录。
+构建结果将输出到 `dist` 目录。
 
-## 📁 项目结构
+### 5. 预览生产版本
+
+```bash
+npm run preview
+```
+
+## 项目结构
 
 ```
 frontend/
+├── public/          # 静态资源
 ├── src/
-│   ├── api/              # API 调用
-│   │   └── coach.ts
-│   ├── components/       # 组件
-│   │   ├── Layout.tsx
-│   │   ├── Loading.tsx
-│   │   ├── Error.tsx
-│   │   ├── ChartView.tsx
-│   │   └── MarkdownView.tsx
-│   ├── hooks/           # 自定义 Hooks
-│   │   └── useDailyAnalysis.ts
-│   ├── pages/           # 页面
-│   │   ├── Home.tsx
-│   │   ├── Analysis.tsx
-│   │   └── History.tsx
-│   ├── types/           # TypeScript 类型
-│   │   └── index.ts
-│   ├── App.tsx          # 根组件
-│   ├── main.tsx         # 入口文件
-│   └── index.css        # 全局样式
-├── package.json
-├── vite.config.ts
-├── tailwind.config.js
-└── tsconfig.json
+│   ├── api/         # API 调用
+│   ├── components/   # 通用组件
+│   ├── hooks/        # 自定义钩子
+│   ├── pages/        # 页面组件
+│   ├── types/        # 类型定义
+│   ├── App.tsx       # 应用入口
+│   ├── main.tsx      # 主文件
+│   └── index.css     # 全局样式
+├── .env.example      # 环境变量示例
+├── package.json      # 项目配置
+├── tsconfig.json     # TypeScript 配置
+└── vite.config.ts    # Vite 配置
 ```
 
-## 🎨 功能特性
+## 页面说明
 
-- ✅ **响应式设计**：适配 PC、平板、手机
-- ✅ **数据可视化**：使用 Recharts 展示跑步数据图表
-- ✅ **Markdown 渲染**：渲染 AI 教练建议
-- ✅ **数据缓存**：使用 React Query 缓存 API 响应
-- ✅ **路由导航**：多页面应用，支持历史记录查看
-- ✅ **错误处理**：友好的错误提示和重试机制
+### 首页 (`/`)
+- 显示最近一次跑步记录
+- 显示今日准备度评分
+- 显示周/月统计数据
+- 显示教练简评
+- 提供教练功能入口
+- 提供 Garmin 绑定功能
 
-## 🛠️ 技术栈
+### 分析页 (`/analysis`)
+- 显示每日训练分析
+- 显示 AI 教练建议
+- 支持查看历史日期的分析
 
-- **React 18** - UI 框架
-- **TypeScript** - 类型安全
-- **Vite** - 构建工具
-- **Tailwind CSS** - 样式框架
-- **React Router** - 路由管理
-- **React Query** - 数据获取和缓存
-- **Recharts** - 图表库
-- **React Markdown** - Markdown 渲染
-- **Axios** - HTTP 客户端
+### 历史页 (`/history`)
+- 显示最近 7 天的训练记录
+- 点击可查看对应日期的详细分析
 
-## 📱 页面说明
+### 晨间报告 (`/morning-report`)
+- 基于昨晚睡眠和近期训练负荷的晨间建议
+- 显示准备度评分和睡眠摘要
 
-### 首页 (/)
-- 显示今日的 AI 教练建议
-- 数据摘要
+### 晚间复盘 (`/evening-review`)
+- 基于今日训练的晚间复盘
+- 显示今日活动和恢复指标
+- 提供 AI 教练复盘和建议
 
-### 详细分析 (/analysis)
-- 完整的 AI 教练建议
-- 跑步数据图表（配速、心率、步频）
-- 原始数据摘要
+### 周度总结 (`/weekly-summary`)
+- 过去 7 天的训练回顾
+- 显示周度统计和训练负荷
+- 提供 AI 周度总结和下周建议
 
-### 历史记录 (/history)
-- 查看最近7天的分析记录
-- 点击日期查看对应日期的分析
+### 伤病记录 (`/injury-log`)
+- 记录和管理伤病情况
+- 支持添加、编辑和标记伤病状态
 
-## 🔧 开发说明
+### 运动员档案 (`/profile`)
+- 管理个人训练数据和目标
+- 支持同步 Garmin 档案数据
+
+### AI 对话 (`/chat`)
+- 与 AI 教练进行对话
+- 显示聊天历史记录
+
+## API 接口
+
+网页端使用与小程序相同的 API 接口，主要包括：
+
+- `/api/coach/daily-analysis` - 获取每日分析
+- `/api/coach/home-summary` - 获取首页摘要
+- `/api/coach/period-analysis` - 获取周期分析
+- `/api/coach/morning-report` - 获取晨间报告
+- `/api/coach/evening-review` - 获取晚间复盘
+- `/api/coach/weekly-summary` - 获取周度总结
+- `/api/coach/injury-log` - 管理伤病记录
+- `/api/coach/profile` - 管理运动员档案
+- `/api/coach/sync-garmin-profile` - 同步 Garmin 档案
+- `/api/wechat/bind-garmin` - 绑定 Garmin 账号
+- `/api/wechat/unbind-garmin` - 解绑 Garmin 账号
+- `/api/wechat/profile` - 获取用户信息
+- `/api/wechat/chat` - 与 AI 对话
+- `/api/wechat/chat/history` - 获取聊天历史
+
+## 性能优化
+
+- 代码分割：将第三方库拆分为独立的 chunks
+- 懒加载：对大型组件进行懒加载
+- 缓存策略：使用 React Query 缓存 API 响应
+- 响应式设计：适配不同屏幕尺寸
+
+## 维护指南
 
 ### 添加新页面
 
-1. 在 `src/pages/` 创建新组件
-2. 在 `src/App.tsx` 添加路由
-3. 在 `src/components/Layout.tsx` 添加导航链接（可选）
+1. 在 `src/pages/` 目录下创建新的页面组件
+2. 在 `src/App.tsx` 中添加路由配置
+3. 在 `src/components/Layout.tsx` 中添加导航项
 
-### 添加新 API
+### 添加新 API 接口
 
-1. 在 `src/api/coach.ts` 添加 API 方法
-2. 创建对应的 Hook（如 `useXXX.ts`）
-3. 在组件中使用 Hook
+1. 在 `src/api/coach.ts` 中添加新的 API 调用函数
+2. 在相应的页面组件中使用该函数
 
-### 样式定制
+### 样式修改
 
-- 修改 `tailwind.config.js` 自定义主题
-- 修改 `src/index.css` 添加全局样式
-- 使用 Tailwind CSS 类名编写组件样式
+- 使用 Tailwind CSS 类进行样式调整
+- 如需自定义样式，可在 `src/index.css` 中添加
 
-## 🚀 部署
+## 故障排除
 
-### Vercel 部署（推荐）
+### API 连接失败
+- 确保后端服务正在运行
+- 检查 `.env` 文件中的 `VITE_API_BASE_URL` 配置
+- 检查网络连接和 CORS 配置
 
-1. 安装 Vercel CLI：
-```bash
-npm i -g vercel
-```
+### 构建失败
+- 检查 TypeScript 错误
+- 检查依赖是否安装正确
+- 检查环境变量配置
 
-2. 部署：
-```bash
-vercel
-```
+### 页面加载缓慢
+- 检查网络连接
+- 检查后端 API 响应时间
+- 考虑优化图片和资源大小
 
-### Netlify 部署
+## 部署
 
-1. 安装 Netlify CLI：
-```bash
-npm i -g netlify-cli
-```
+1. 构建生产版本：`npm run build`
+2. 将 `dist` 目录部署到静态网站托管服务
+3. 配置后端 API 地址
+4. 确保 CORS 配置正确
 
-2. 部署：
-```bash
-netlify deploy --prod
-```
+## 注意事项
 
-### 传统服务器部署
+- 网页端与小程序使用相同的后端 API，确保后端服务正常运行
+- 绑定 Garmin 账号时，确保输入正确的账号密码
+- 中国区用户需要勾选"中国区账号"选项
+- 同步 Garmin 数据可能需要一定时间，请耐心等待
 
-1. 构建：
-```bash
-npm run build
-```
+## 许可证
 
-2. 将 `dist` 目录内容上传到服务器
-3. 配置 Nginx 指向 `dist` 目录
-
-## 📝 注意事项
-
-1. **API 地址**：确保后端 API 已启动，且地址配置正确
-2. **CORS**：如果 API 在不同域名，需要配置 CORS
-3. **环境变量**：生产环境记得配置正确的 `VITE_API_BASE_URL`
-
-## 📱 小程序对接说明
-
-后端提供以下接口用于小程序：
-
-- `POST /api/wechat/login`（获取 openid）
-- `POST /api/wechat/bind-garmin`（绑定 Garmin 账号）
-- `POST /api/wechat/unbind-garmin`（解绑）
-- `GET /api/wechat/profile`（查询绑定状态）
-- `POST /api/wechat/chat`（对话入口）
-
-## 🔗 相关链接
-
-- [React 文档](https://react.dev/)
-- [Vite 文档](https://vitejs.dev/)
-- [Tailwind CSS 文档](https://tailwindcss.com/)
-- [React Query 文档](https://tanstack.com/query/latest)
+MIT License
