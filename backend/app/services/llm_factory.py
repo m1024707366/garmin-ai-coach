@@ -12,8 +12,8 @@ from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# 类型别名：LLM 服务实例（DeepSeekService 或 GeminiService，接口一致）
-LLMService = Union["DeepSeekService", "GeminiService"]  # noqa: F821
+# 类型别名：LLM 服务实例（DeepSeekService、GeminiService 或 OpenAIService，接口一致）
+LLMService = Union["DeepSeekService", "GeminiService", "OpenAIService"]  # noqa: F821
 
 
 def get_llm_service(model_name: Optional[str] = None) -> LLMService:
@@ -24,7 +24,7 @@ def get_llm_service(model_name: Optional[str] = None) -> LLMService:
         model_name: 可选的模型名覆盖
 
     Returns:
-        DeepSeekService 或 GeminiService 实例（接口一致）
+        DeepSeekService、GeminiService 或 OpenAIService 实例（接口一致）
 
     Raises:
         ValueError: 如果 LLM_PROVIDER 不支持
@@ -43,8 +43,14 @@ def get_llm_service(model_name: Optional[str] = None) -> LLMService:
         logger.info("[LLM Factory] 使用 Gemini 服务")
         return GeminiService(model_name=model_name)
 
+    elif provider == "openai":
+        from backend.app.services.openai_service import OpenAIService
+
+        logger.info("[LLM Factory] 使用 OpenAI 服务")
+        return OpenAIService(model_name=model_name)
+
     else:
         raise ValueError(
             f"不支持的 LLM_PROVIDER: '{provider}'，"
-            "请在 .env 中设置为 'deepseek' 或 'gemini'"
+            "请在 .env 中设置为 'deepseek'、'gemini' 或 'openai'"
         )

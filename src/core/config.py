@@ -36,7 +36,13 @@ class Settings(BaseSettings):
     DEEPSEEK_API_KEY: Optional[str] = None
     DEEPSEEK_MODEL_NAME: str = "deepseek-reasoner"  # R1 推理模型
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
-    LLM_PROVIDER: str = "deepseek"  # "deepseek" 或 "gemini"
+    
+    # OpenAI
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL_NAME: str = "gpt-3.5-turbo"
+    OPENAI_BASE_URL: Optional[str] = None  # 自定义OpenAI API地址
+    
+    LLM_PROVIDER: str = "deepseek"  # "deepseek", "gemini" 或 "openai"
     # Runtime behavior
     USE_MOCK_MODE: bool = False
     ANALYSIS_CACHE_HOURS: int = 24
