@@ -126,17 +126,241 @@ npm run build
 - **Vercel**: 导入前端项目
 - **Netlify**: 导入前端项目
 
-## 数据库配置
+## 服务器部署指南
 
-### 1. 创建数据库
+### 准备服务器
 
-```sql
-CREATE DATABASE garmin_coach CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+推荐使用 Linux 服务器（Ubuntu 20.04+ 或 CentOS 7+），并确保服务器已安装：
+- Python 3.8+
+- pip
+- MySQL 5.7+
+- Git
+
+### 1. 服务器环境准备
+
+```bash
+# 更新系统
+sudo apt update && sudo apt upgrade -y
+
+# 安装依赖
+sudo apt install -y python3 python3-pip python3-venv git mysql-server
+
+# 创建项目目录
+sudo mkdir -p /var/www/garmin-ai-coach
+sudo chown -R $USER:$USER /var/www/garmin-ai-coach
 ```
 
-### 2. 数据库初始化
+### 2. 数据库配置
 
-应用启动时会自动创建所需的数据库表。
+#### 创建数据库
+
+```sql
+sudo mysql -u root -p
+
+-- 创建数据库
+CREATE DATABASE garmin_coach CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 创建数据库用户
+CREATE USER 'garmin_user'@'localhost' IDENTIFIED BY 'your_strong_password';
+GRANT ALL PRIVILEGES ON garmin_coach.* TO 'garmin_user'@'localhost';
+FLUSH PRIVILEGES;
+```
+
+### 3. 部署项目
+
+#### 3.1 克隆代码
+
+```bash
+cd /var/www/garmin-ai-coach
+git clone https://github.com/your-username/garmin-ai-coach.git .
+```
+
+#### 3.2 创建环境变量文件
+
+```bash
+# 在项目根目录创建 .env 文件
+cp .env.example .env
+
+# 编辑 .env 文件，配置数据库连接和其他环境变量
+nano .env
+```
+
+#### 3.3 使用部署脚本（推荐）
+
+项目提供了自动化部署脚本：
+
+```bash
+# 设置执行权限
+chmod +x scripts/deploy.sh
+
+# 运行部署脚本（需要 root 权限）
+sudo ./scripts/deploy.sh
+```
+
+部署脚本会自动：
+- 停止当前运行的服务
+- 拉取最新代码
+- 创建/更新虚拟环境
+- 安装依赖
+- 启动服务
+
+#### 3.4 手动部署步骤
+
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+
+# 激活虚拟环境
+source venv/bin/activate
+
+# 升级 pip
+pip install --upgrade pip
+
+# 安装依赖
+pip install -r requirements.txt
+
+# 启动服务
+nohup python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 > server.log 2>&1 &
+```
+
+### 4. 前端部署
+
+前端可以部署到任何静态文件服务器：
+
+#### 4.1 构建前端
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+构建产物在 `frontend/dist` 目录。
+
+#### 4.2 使用 Nginx 部署前端
+
+```bash
+# 安装 Nginx
+sudo apt install -y nginx
+
+# 配置 Nginx
+sudo nano /etc/nginx/sites-available/garmin-coach
+```
+
+配置文件内容：
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    
+    # 前端静态文件
+    location / {
+        root /var/www/garmin-ai-coach/frontend/dist;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+    
+    # API 反向代理
+    location /api/ {
+        proxy_pass http://localhost:8000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+启用站点：
+```bash
+sudo ln -s /etc/nginx/sites-available/garmin-coach /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### 5. 服务管理
+
+#### 5.1 启动服务
+
+```bash
+# 使用启动脚本
+chmod +x scripts/start_server.sh
+./scripts/start_server.sh
+
+# 或直接启动
+cd /var/www/garmin-ai-coach
+source venv/bin/activate
+python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
+
+#### 5.2 停止服务
+
+```bash
+# 查找进程
+ps aux | grep uvicorn
+
+# 终止进程
+kill -9 <pid>
+```
+
+#### 5.3 查看日志
+
+```bash
+# 服务日志
+tail -f /var/log/garmin-ai-coach.log
+
+# 或查看当前工作目录的日志
+tail -f server.log
+```
+
+### 6. 使用 systemd 管理服务（推荐）
+
+创建 systemd 服务文件：
+
+```bash
+sudo nano /etc/systemd/system/garmin-ai-coach.service
+```
+
+内容：
+```ini
+[Unit]
+Description=Garmin AI Coach Backend
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/garmin-ai-coach
+Environment=PATH=/var/www/garmin-ai-coach/venv/bin
+ExecStart=/var/www/garmin-ai-coach/venv/bin/python3 -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启用服务：
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable garmin-ai-coach
+sudo systemctl start garmin-ai-coach
+
+# 查看状态
+sudo systemctl status garmin-ai-coach
+```
+
+### 7. 数据库初始化
+
+应用启动时会自动创建所需的数据库表。如果需要手动初始化：
+
+```bash
+cd /var/www/garmin-ai-coach
+source venv/bin/activate
+python -c "from backend.app.db.session import init_db; init_db()"
+```
 
 ## 运行和测试
 
