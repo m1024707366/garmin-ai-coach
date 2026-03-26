@@ -149,11 +149,6 @@ frontend/
 - `/api/coach/injury-log` - 管理伤病记录
 - `/api/coach/profile` - 管理运动员档案
 - `/api/coach/sync-garmin-profile` - 同步 Garmin 档案
-- `/api/wechat/bind-garmin` - 绑定 Garmin 账号
-- `/api/wechat/unbind-garmin` - 解绑 Garmin 账号
-- `/api/wechat/profile` - 获取用户信息
-- `/api/wechat/chat` - 与 AI 对话
-- `/api/wechat/chat/history` - 获取聊天历史
 
 ## 性能优化
 

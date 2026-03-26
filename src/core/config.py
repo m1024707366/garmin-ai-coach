@@ -13,14 +13,7 @@ class Settings(BaseSettings):
     GARMIN_IS_CN: bool = False  # True = connect.garmin.cn（中国），False = connect.garmin.com（国际）
     PROXY_URL: Optional[str] = None  # 代理 URL，用于访问 Google API（例如：http://127.0.0.1:7890）
 
-    # WeChat mini program
-    WECHAT_MINI_APPID: Optional[str] = None
-    WECHAT_MINI_SECRET: Optional[str] = None
-    WECHAT_SUBSCRIBE_TEMPLATE_ID: Optional[str] = None
-    WECHAT_SUBSCRIBE_PAGE: str = "pages/index/index"
-    WECHAT_TOKEN_CACHE_SECONDS: int = 7000
-    WECHAT_AUTH_SECRET: Optional[str] = None
-    WECHAT_ACCESS_TOKEN_EXPIRES_SECONDS: int = 86400 * 30
+
 
     # Garmin credential encryption
     GARMIN_CRED_ENCRYPTION_KEY: Optional[str] = None
