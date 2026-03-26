@@ -381,6 +381,37 @@ async def get_home_summary_endpoint(
     db: Optional[Session] = Depends(get_db_optional),
     home_summary_service: HomeSummaryService = Depends(get_home_summary_service),
 ):
+    # 如果没有数据库且在mock模式下，返回示例数据
+    if not db and USE_MOCK_MODE:
+        mock_data = {
+            "latest_run": {
+                "start_time": "2026-03-25T07:30:00",
+                "distance_km": 10.5,
+                "intensity": "中等",
+                "avg_pace": "5:30",
+                "duration_min": 58,
+            },
+            "week_stats": {
+                "distance_km": 42.0,
+                "avg_speed_kmh": 10.5,
+            },
+            "month_stats": {
+                "distance_km": 168.0,
+                "avg_speed_kmh": 10.2,
+            },
+            "readiness": {
+                "score": 8,
+                "verdict": "今天状态绝佳，适合高质量训练！",
+                "factors": [
+                    {"name": "睡眠", "value": 85, "status": "green"},
+                    {"name": "身体电量", "value": 75, "status": "green"},
+                    {"name": "HRV", "value": "BALANCED", "status": "green"},
+                ],
+            },
+            "updated_at": datetime.now().isoformat(),
+        }
+        return HomeSummaryResponse(**mock_data)
+
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
