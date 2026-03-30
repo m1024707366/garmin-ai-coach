@@ -7,10 +7,13 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # 安装系统依赖
-RUN apt-get update && apt-get install -y \
-    gcc \
-    python3-dev \
-    default-libmysqlclient-dev \
+# 替换为国内阿里云源，解决安装卡住/超时
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y \
+        gcc \
+        python3-dev \
+        default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
