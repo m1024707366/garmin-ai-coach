@@ -21,14 +21,12 @@ RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debia
 COPY requirements.txt .
 
 # 安装Python依赖
-# 安装Python依赖，使用清华镜像源（加速）
+# 使用清华镜像源（加速）
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 复制整个项目（因为构建上下文是项目根目录）
-COPY . .
+# 复制应用代码
+COPY backend ./backend
+COPY src ./src
 
-# 调试：打印当前目录结构
-RUN ls -la /app
-
-# 启动应用（先打印调试信息）
-CMD ["sh", "-c", "echo 'Python version:' && python --version && echo '\\nCurrent directory:' && pwd && echo '\\nFiles in /app:' && ls -la /app && echo '\\nTrying to import backend...' && python -c 'import backend; print(\"Success\")' || echo 'Failed' && echo '\\nStarting uvicorn...' && python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000"]
+# 启动应用
+CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
