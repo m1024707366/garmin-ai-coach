@@ -8,9 +8,9 @@ from cryptography.fernet import Fernet
 from src.core.config import settings
 
 
-def _normalize_key(raw_key: Optional[str]) -> bytes:
+def _normalize_key(raw_key: Optional[str]) -> Optional[bytes]:
     if raw_key is None:
-        raise ValueError("GARMIN_CRED_ENCRYPTION_KEY is required")
+        return None
 
     key = raw_key.strip().encode("utf-8")
     try:
@@ -23,22 +23,37 @@ def _normalize_key(raw_key: Optional[str]) -> bytes:
     if len(key) == 32:
         return base64.urlsafe_b64encode(key)
 
-    raise ValueError("GARMIN_CRED_ENCRYPTION_KEY must be 32 bytes or base64-encoded 32 bytes")
+    return None
 
 
-def _get_fernet() -> Fernet:
-    return Fernet(_normalize_key(settings.GARMIN_CRED_ENCRYPTION_KEY))
+def _get_fernet() -> Optional[Fernet]:
+    key = _normalize_key(settings.GARMIN_CRED_ENCRYPTION_KEY)
+    if key is None:
+        return None
+    return Fernet(key)
 
 
 def encrypt_text(plain: str) -> str:
     if plain is None:
         raise ValueError("plain text is required")
-    token = _get_fernet().encrypt(plain.encode("utf-8"))
+    
+    fernet = _get_fernet()
+    if fernet is None:
+        # 没有加密密钥，直接返回明文
+        return plain
+    
+    token = fernet.encrypt(plain.encode("utf-8"))
     return token.decode("utf-8")
 
 
 def decrypt_text(cipher: str) -> str:
     if cipher is None:
         raise ValueError("cipher text is required")
-    plain = _get_fernet().decrypt(cipher.encode("utf-8"))
+    
+    fernet = _get_fernet()
+    if fernet is None:
+        # 没有加密密钥，直接返回密文（实际是明文）
+        return cipher
+    
+    plain = fernet.decrypt(cipher.encode("utf-8"))
     return plain.decode("utf-8")

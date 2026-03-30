@@ -15,7 +15,8 @@ class Settings(BaseSettings):
 
 
 
-    # Garmin credential encryption
+    # Garmin credential encryption (optional)
+    # If not provided, passwords will be stored in plain text
     GARMIN_CRED_ENCRYPTION_KEY: Optional[str] = None
 
     # Database

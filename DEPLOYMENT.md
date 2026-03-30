@@ -24,8 +24,9 @@ GARMIN_EMAIL=your_garmin_email@example.com
 GARMIN_PASSWORD=your_garmin_password
 GARMIN_IS_CN=false  # True 表示中国区，False 表示国际版
 
-# Garmin 凭证加密密钥
-GARMIN_CRED_ENCRYPTION_KEY=your_32_byte_encryption_key
+# Garmin 凭证加密密钥（可选）
+# 如果不提供，密码将以明文形式存储
+# GARMIN_CRED_ENCRYPTION_KEY=your_32_byte_encryption_key
 
 # LLM 配置
 LLM_PROVIDER=deepseek  # 可选: deepseek, gemini, openai
