@@ -210,7 +210,9 @@ services:
 
 ## 维护和更新
 
-### 更新代码
+### 更新代码（仅当需要更新代码时）
+
+如果需要更新应用代码：
 
 ```bash
 # 拉取最新代码
@@ -218,6 +220,13 @@ git pull
 
 # 重新构建并启动
 docker compose up -d --build
+```
+
+如果只是重启服务而不需要更新代码：
+
+```bash
+# 重启服务
+docker compose restart
 ```
 
 ### 备份数据库
