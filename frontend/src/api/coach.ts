@@ -85,7 +85,7 @@ export const coachApi = {
   /**
    * 绑定 Garmin 账号
    */
-  bindGarmin: async (payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
+  bindGarmin: async (_payload: { garmin_email: string; garmin_password: string; is_cn: boolean }) => {
     // 注意：后端暂未实现此 API，使用模拟数据
     console.warn('Backend API not implemented: /api/coach/bind-garmin')
     return { bound: true }
@@ -112,7 +112,7 @@ export const coachApi = {
   /**
    * 聊天
    */
-  chat: async (payload: { message: string }) => {
+  chat: async (_payload: { message: string }) => {
     // 注意：后端暂未实现此 API，使用模拟数据
     console.warn('Backend API not implemented: /api/coach/chat')
     return { reply: '这是一个模拟的回复' }
@@ -121,7 +121,7 @@ export const coachApi = {
   /**
    * 获取聊天历史
    */
-  getChatHistory: async (limit: number = 20) => {
+  getChatHistory: async (_limit: number = 20) => {
     // 注意：后端暂未实现此 API，使用模拟数据
     console.warn('Backend API not implemented: /api/coach/chat-history')
     return { messages: [] }
