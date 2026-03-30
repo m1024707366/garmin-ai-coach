@@ -5,6 +5,7 @@ WORKDIR /app
 # 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+ENV PYTHONPATH=/app
 
 # 安装系统依赖
 # 替换为国内阿里云源，解决安装卡住/超时
