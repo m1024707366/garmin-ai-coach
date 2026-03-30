@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: garmin-coach-backend
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - GARMIN_EMAIL=${GARMIN_EMAIL}
+      - GARMIN_PASSWORD=${GARMIN_PASSWORD}
+      - GARMIN_IS_CN=${GARMIN_IS_CN:-false}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - USE_MOCK_MODE=${USE_MOCK_MODE:-false}
+      - ENABLE_GARMIN_POLLING=${ENABLE_GARMIN_POLLING:-false}
+      - GARMIN_CRED_ENCRYPTION_KEY=${GARMIN_CRED_ENCRYPTION_KEY}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    networks:
+      - garmin-coach-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: garmin-coach-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - garmin-coach-network
+
+networks:
+  garmin-coach-network:
+    driver: bridge
