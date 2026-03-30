@@ -4,8 +4,8 @@ services:
   # 后端服务
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: garmin-coach-backend
     environment:
       - DATABASE_URL=${DATABASE_URL}
