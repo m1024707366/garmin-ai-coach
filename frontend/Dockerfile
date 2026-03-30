@@ -6,8 +6,8 @@ WORKDIR /app
 # 复制依赖文件
 COPY package*.json ./
 
-# 安装依赖（使用淘宝镜像源加速）
-RUN npm config set registry https://registry.npmmirror.com && npm ci
+# 安装依赖（使用腾讯云镜像源加速）
+RUN npm config set registry https://mirrors.cloud.tencent.com/npm/ && npm ci
 
 # 复制源代码
 COPY . .
