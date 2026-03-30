@@ -24,9 +24,8 @@ COPY requirements.txt .
 # 安装Python依赖，使用清华镜像源（加速）
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
-# 复制应用代码
-COPY backend ./backend
-COPY src ./src
+# 复制整个项目（因为构建上下文是项目根目录）
+COPY . .
 
 # 调试：打印当前目录结构
 RUN ls -la /app
