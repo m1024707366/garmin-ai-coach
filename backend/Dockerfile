@@ -27,9 +27,10 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua
 # 复制应用代码
 COPY backend ./backend
 COPY src ./src
+COPY debug_python.py .
 
 # 调试：打印当前目录结构
 RUN ls -la /app
 
-# 启动应用
-CMD ["python", "-m", "uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 运行调试脚本
+CMD ["python", "debug_python.py"]
