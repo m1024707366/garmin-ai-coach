@@ -25,8 +25,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 复制应用代码
-COPY backend .
-COPY src .
+COPY backend ./backend
+COPY src ./src
 
 # 启动应用
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
