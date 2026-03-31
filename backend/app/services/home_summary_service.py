@@ -6,8 +6,8 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from backend.app.db.crud import get_daily_summary_by_date, get_garmin_credential
-from backend.app.db.models import Activity, GarminDailySummary, WechatUser, User
+from backend.app.db.crud import get_daily_summary_by_date
+from backend.app.db.models import Activity, GarminDailySummary, User
 from backend.app.services.llm_factory import get_llm_service
 from src.core.config import settings
 
@@ -218,47 +218,14 @@ class HomeSummaryService:
         self,
         *,
         db: Session,
-        wechat_user_id: int,
+        user_id: int,
         include_ai_brief: bool = True,
     ) -> Dict[str, Any]:
-        wechat_user = (
-            db.query(WechatUser).filter(WechatUser.id == wechat_user_id).one_or_none()
-        )
-        if not wechat_user:
-            logger.warning(f"[HomeSummary] WechatUser {wechat_user_id} not found")
-            return {
-                "latest_run": None,
-                "week_stats": None,
-                "month_stats": None,
-                "readiness": None,
-                "ai_brief": None,
-                "updated_at": datetime.utcnow().isoformat(),
-            }
-
-        credential = get_garmin_credential(db, wechat_user_id=wechat_user_id)
-        if not credential:
-            logger.warning(
-                f"[HomeSummary] No Garmin credential for wechat_user {wechat_user_id}"
-            )
-            return {
-                "latest_run": None,
-                "week_stats": None,
-                "month_stats": None,
-                "readiness": None,
-                "ai_brief": None,
-                "updated_at": datetime.utcnow().isoformat(),
-            }
-
-        # 临时方案：用 Garmin 邮箱查找对应的 User（同一 Garmin 账号）
         user = (
-            db.query(User)
-            .filter(User.garmin_email == credential.garmin_email)
-            .one_or_none()
+            db.query(User).filter(User.id == user_id).one_or_none()
         )
         if not user:
-            logger.warning(
-                f"[HomeSummary] No User found for email {credential.garmin_email}"
-            )
+            logger.warning(f"[HomeSummary] User {user_id} not found")
             return {
                 "latest_run": None,
                 "week_stats": None,

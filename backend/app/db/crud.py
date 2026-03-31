@@ -14,19 +14,14 @@ from sqlalchemy.orm import Session, joinedload
 from backend.app.db.models import (
     Activity,
     ActivityLap,
-    ChatMessage,
     CoachMemory,
     DailyAnalysis,
     GarminDailySummary,
-    GarminCredential,
     HomeSummary,
     InjuryLog,
-    NotificationLog,
-    SyncState,
     TrainingPlan,
     User,
     UserProfile,
-    WechatUser,
     WeeklyReport,
 )
 
@@ -97,128 +92,13 @@ def get_or_create_user(db: Session, *, garmin_email: str) -> User:
     return user
 
 
-def get_or_create_wechat_user(db: Session, *, openid: str, unionid: Optional[str] = None) -> WechatUser:
-    user = db.query(WechatUser).filter(WechatUser.openid == openid).one_or_none()
-    if user:
-        if unionid and user.unionid != unionid:
-            user.unionid = unionid
-        return user
-    user = WechatUser(openid=openid, unionid=unionid)
-    db.add(user)
-    db.flush()
-    return user
 
 
-def get_garmin_credential(db: Session, *, wechat_user_id: int) -> Optional[GarminCredential]:
-    return (
-        db.query(GarminCredential)
-        .filter(GarminCredential.wechat_user_id == wechat_user_id)
-        .one_or_none()
-    )
 
-
-def upsert_garmin_credential(
-    db: Session,
-    *,
-    wechat_user_id: int,
-    garmin_email: str,
-    garmin_password: str,
-    is_cn: bool,
-) -> GarminCredential:
-    existing = (
-        db.query(GarminCredential)
-        .filter(GarminCredential.wechat_user_id == wechat_user_id)
-        .filter(GarminCredential.garmin_email == garmin_email)
-        .one_or_none()
-    )
-    fields = {
-        "garmin_email": garmin_email,
-        "garmin_password": garmin_password,
-        "is_cn": 1 if is_cn else 0,
-    }
-    if existing:
-        for k, v in fields.items():
-            setattr(existing, k, v)
-        return existing
-    row = GarminCredential(wechat_user_id=wechat_user_id, **fields)
-    db.add(row)
-    db.flush()
-    return row
-
-
-def get_or_create_sync_state(db: Session, *, wechat_user_id: int) -> SyncState:
-    state = (
-        db.query(SyncState)
-        .filter(SyncState.wechat_user_id == wechat_user_id)
-        .one_or_none()
-    )
-    if state:
-        return state
-    state = SyncState(wechat_user_id=wechat_user_id)
-    db.add(state)
-    db.flush()
-    return state
-
-
-def log_notification(
-    db: Session,
-    *,
-    wechat_user_id: int,
-    event_type: str,
-    event_key: str,
-    status: Optional[str] = None,
-    error_message: Optional[str] = None,
-) -> NotificationLog:
-    existing = (
-        db.query(NotificationLog)
-        .filter(NotificationLog.wechat_user_id == wechat_user_id)
-        .filter(NotificationLog.event_type == event_type)
-        .filter(NotificationLog.event_key == event_key)
-        .one_or_none()
-    )
-    sent_at = datetime.utcnow() if status == "sent" else None
-
-    if existing:
-        existing.status = status
-        existing.error_message = error_message
-        if sent_at is not None:
-            existing.sent_at = sent_at
-        return existing
-
-    row = NotificationLog(
-        wechat_user_id=wechat_user_id,
-        event_type=event_type,
-        event_key=event_key,
-        status=status,
-        error_message=error_message,
-        sent_at=sent_at,
-    )
-    db.add(row)
-    return row
-
-
-def has_notification_sent(
-    db: Session,
-    *,
-    wechat_user_id: int,
-    event_type: str,
-    event_key: str,
-) -> bool:
-    row = (
-        db.query(NotificationLog)
-        .filter(NotificationLog.wechat_user_id == wechat_user_id)
-        .filter(NotificationLog.event_type == event_type)
-        .filter(NotificationLog.event_key == event_key)
-        .filter(NotificationLog.status == "sent")
-        .one_or_none()
-    )
-    return row is not None
-
-
-def get_home_summary(db: Session, *, wechat_user_id: int) -> Optional[HomeSummary]:
+def get_home_summary(db: Session, *, user_id: int) -> Optional[HomeSummary]:
     return (
         db.query(HomeSummary)
-        .filter(HomeSummary.wechat_user_id == wechat_user_id)
+        .filter(HomeSummary.user_id == user_id)
         .one_or_none()
     )
 
@@ -226,7 +106,7 @@ def get_home_summary(db: Session, *, wechat_user_id: int) -> Optional[HomeSummar
 def upsert_home_summary(
     db: Session,
     *,
-    wechat_user_id: int,
+    user_id: int,
     latest_run_json: Optional[dict[str, Any]] = None,
     week_stats_json: Optional[dict[str, Any]] = None,
     month_stats_json: Optional[dict[str, Any]] = None,
@@ -234,7 +114,7 @@ def upsert_home_summary(
 ) -> HomeSummary:
     existing = (
         db.query(HomeSummary)
-        .filter(HomeSummary.wechat_user_id == wechat_user_id)
+        .filter(HomeSummary.user_id == user_id)
         .one_or_none()
     )
 
@@ -250,7 +130,7 @@ def upsert_home_summary(
             setattr(existing, k, v)
         return existing
 
-    row = HomeSummary(wechat_user_id=wechat_user_id, **fields)
+    row = HomeSummary(user_id=user_id, **fields)
     db.add(row)
     db.flush()
     return row
@@ -616,39 +496,7 @@ def upsert_user_profile(
     return row
 
 
-def get_chat_messages(
-    db: Session,
-    *,
-    wechat_user_id: int,
-    limit: int = 20,
-) -> list[ChatMessage]:
-    """获取用户的聊天历史"""
-    return (
-        db.query(ChatMessage)
-        .filter(ChatMessage.wechat_user_id == wechat_user_id)
-        .order_by(ChatMessage.created_at.desc())
-        .limit(limit)
-        .all()
-    )
 
-
-def add_chat_message(
-    db: Session,
-    *,
-    wechat_user_id: int,
-    role: str,
-    content: str,
-    context_json: Optional[dict[str, Any]] = None,
-) -> ChatMessage:
-    """添加聊天消息"""
-    row = ChatMessage(
-        wechat_user_id=wechat_user_id,
-        role=role,
-        content=content,
-        context_json=context_json,
-    )
-    db.add(row)
-    return row
 
 
 # ---------------------------------------------------------------------------

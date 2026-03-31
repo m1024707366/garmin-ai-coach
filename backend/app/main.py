@@ -416,18 +416,18 @@ async def get_home_summary_endpoint(
         raise HTTPException(status_code=500, detail="数据库不可用")
 
     # 暂时使用固定的用户 ID，实际生产环境需要实现用户认证
-    wechat_user_id = 1
-    cached = get_home_summary(db, wechat_user_id=wechat_user_id)
+    user_id = 1
+    cached = get_home_summary(db, user_id=user_id)
     try:
         summary = home_summary_service.build_summary(
             db=db,
-            wechat_user_id=wechat_user_id,
+            user_id=user_id,
             include_ai_brief=False,
         )
 
         upsert_home_summary(
             db,
-            wechat_user_id=wechat_user_id,
+            user_id=user_id,
             latest_run_json=summary.get("latest_run"),
             week_stats_json=summary.get("week_stats"),
             month_stats_json=summary.get("month_stats"),
@@ -602,7 +602,7 @@ async def get_daily_analysis(
 ):
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    wechat_user_id = 1
+    user_id = 1
     """
     获取每日训练分析和 AI 教练建议。
     
@@ -641,7 +641,7 @@ async def get_daily_analysis(
 
     try:
         result = report_service.build_daily_analysis(
-            wechat_user_id=wechat_user_id,
+            user_id=user_id,
             analysis_date=analysis_date,
             force_refresh=force_refresh,
             db=db,

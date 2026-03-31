@@ -20,6 +20,8 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     garmin_email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    garmin_password: Mapped[str] = mapped_column(Text, nullable=False)
+    is_cn: Mapped[bool] = mapped_column(Integer, nullable=False, default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -61,122 +63,22 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
-
-
-class WechatUser(Base):
-    __tablename__ = "wechat_users"
-    __table_args__ = {"mysql_charset": "utf8mb4"}
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    openid: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    unionid: Mapped[Optional[str]] = mapped_column(String(128))
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    last_active_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
-    garmin_credentials: Mapped[list[GarminCredential]] = relationship(
-        back_populates="wechat_user",
-        cascade="all, delete-orphan",
-    )
-    sync_states: Mapped[list[SyncState]] = relationship(
-        back_populates="wechat_user",
-        cascade="all, delete-orphan",
-    )
-    notification_logs: Mapped[list[NotificationLog]] = relationship(
-        back_populates="wechat_user",
-        cascade="all, delete-orphan",
-    )
-    home_summary: Mapped[Optional[HomeSummary]] = relationship(
-        back_populates="wechat_user",
+    home_summary: Mapped[Optional["HomeSummary"]] = relationship(
+        back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
     )
-    chat_messages: Mapped[list["ChatMessage"]] = relationship(
-        back_populates="wechat_user",
-        cascade="all, delete-orphan",
-    )
-
-
-class GarminCredential(Base):
-    __tablename__ = "garmin_credentials"
-    __table_args__ = (
-        UniqueConstraint("wechat_user_id", "garmin_email", name="uq_garmin_cred_user_email"),
-        {"mysql_charset": "utf8mb4"},
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wechat_user_id: Mapped[int] = mapped_column(ForeignKey("wechat_users.id", ondelete="CASCADE"), nullable=False)
-
-    garmin_email: Mapped[str] = mapped_column(String(255), nullable=False)
-    garmin_password: Mapped[str] = mapped_column(Text, nullable=False)
-    is_cn: Mapped[bool] = mapped_column(Integer, nullable=False, default=0)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    wechat_user: Mapped[WechatUser] = relationship(back_populates="garmin_credentials")
-
-
-class SyncState(Base):
-    __tablename__ = "sync_states"
-    __table_args__ = (
-        UniqueConstraint("wechat_user_id", name="uq_sync_state_wechat_user"),
-        {"mysql_charset": "utf8mb4"},
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wechat_user_id: Mapped[int] = mapped_column(ForeignKey("wechat_users.id", ondelete="CASCADE"), nullable=False)
-
-    last_activity_id: Mapped[Optional[int]] = mapped_column(BigInteger)
-    last_summary_date: Mapped[Optional[date]] = mapped_column(Date)
-    last_poll_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime,
-        server_default=func.now(),
-        onupdate=func.now(),
-        nullable=False,
-    )
-
-    wechat_user: Mapped[WechatUser] = relationship(back_populates="sync_states")
-
-
-class NotificationLog(Base):
-    __tablename__ = "notification_logs"
-    __table_args__ = (
-        UniqueConstraint("wechat_user_id", "event_type", "event_key", name="uq_notify_user_type_key"),
-        {"mysql_charset": "utf8mb4"},
-    )
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wechat_user_id: Mapped[int] = mapped_column(ForeignKey("wechat_users.id", ondelete="CASCADE"), nullable=False)
-
-    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
-    event_key: Mapped[str] = mapped_column(String(128), nullable=False)
-    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    status: Mapped[Optional[str]] = mapped_column(String(32))
-    error_message: Mapped[Optional[str]] = mapped_column(Text)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-
-    wechat_user: Mapped[WechatUser] = relationship(back_populates="notification_logs")
 
 
 class HomeSummary(Base):
     __tablename__ = "home_summaries"
     __table_args__ = (
-        UniqueConstraint("wechat_user_id", name="uq_home_summary_wechat_user"),
+        UniqueConstraint("user_id", name="uq_home_summary_user"),
         {"mysql_charset": "utf8mb4"},
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wechat_user_id: Mapped[int] = mapped_column(ForeignKey("wechat_users.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     latest_run_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
     week_stats_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
@@ -191,7 +93,7 @@ class HomeSummary(Base):
         nullable=False,
     )
 
-    wechat_user: Mapped[WechatUser] = relationship(back_populates="home_summary")
+    user: Mapped[User] = relationship(back_populates="home_summary")
 
 
 class GarminDailySummary(Base):

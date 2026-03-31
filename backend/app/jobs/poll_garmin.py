@@ -7,11 +7,9 @@ from typing import Any, Dict, Optional
 from sqlalchemy.orm import Session
 
 from backend.app.db.crud import (
-    get_or_create_sync_state,
-    get_garmin_credential,
     upsert_home_summary,
 )
-from backend.app.db.models import WechatUser
+from backend.app.db.models import User
 from backend.app.services.home_summary_service import HomeSummaryService
 from backend.app.services.report_service import ReportService
 
@@ -57,34 +55,20 @@ def _build_latest_snapshot() -> Dict[str, Any]:
 def poll_garmin_for_user(
     *,
     db: Session,
-    wechat_user: WechatUser,
+    user_id: int,
     report_service: ReportService,
     home_summary_service: HomeSummaryService,
 ) -> None:
-    credential = get_garmin_credential(db, wechat_user_id=wechat_user.id)
-    if credential is None:
+    # 获取用户
+    user = db.query(User).filter(User.id == user_id).one_or_none()
+    if user is None:
         return
 
-    sync_state = get_or_create_sync_state(db, wechat_user_id=wechat_user.id)
     latest_snapshot = _build_latest_snapshot()
-
-    # 强制每次都执行同步，不管是否有新数据
-    # 注释掉下面的检测逻辑
-    # if not detect_new_data(
-    #     {
-    #         "last_activity_id": sync_state.last_activity_id,
-    #         "last_summary_date": sync_state.last_summary_date.isoformat() if sync_state.last_summary_date else None,
-    #     },
-    #     latest_snapshot,
-    # ):
-    #     sync_state.last_poll_at = datetime.utcnow()
-    #     db.commit()
-    #     return
-
     analysis_date = latest_snapshot.get("latest_summary_date") or datetime.now().date().isoformat()
 
     result = report_service.build_daily_analysis(
-        wechat_user_id=wechat_user.id,
+        user_id=user_id,
         analysis_date=analysis_date,
         force_refresh=True,
         db=db,
@@ -92,23 +76,19 @@ def poll_garmin_for_user(
 
     home_summary_payload = home_summary_service.build_summary(
         db=db,
-        wechat_user_id=wechat_user.id,
+        user_id=user_id,
         include_ai_brief=False,
     )
     upsert_home_summary(
         db,
-        wechat_user_id=wechat_user.id,
+        user_id=user_id,
         latest_run_json=home_summary_payload.get("latest_run"),
         week_stats_json=home_summary_payload.get("week_stats"),
         month_stats_json=home_summary_payload.get("month_stats"),
         ai_brief_json=None,
     )
 
-    sync_state.last_summary_date = datetime.strptime(analysis_date, "%Y-%m-%d").date()
-    sync_state.last_activity_id = latest_snapshot.get("latest_activity_id")
-    sync_state.last_poll_at = datetime.utcnow()
     db.commit()
-
     _ = result
 
 
@@ -116,12 +96,12 @@ def poll_garmin(db: Session) -> None:
     report_service = ReportService()
     home_summary_service = HomeSummaryService()
 
-    users = db.query(WechatUser).all()
+    users = db.query(User).all()
     for user in users:
         try:
             poll_garmin_for_user(
                 db=db,
-                wechat_user=user,
+                user_id=user.id,
                 report_service=report_service,
                 home_summary_service=home_summary_service,
             )

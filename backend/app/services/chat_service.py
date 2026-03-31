@@ -7,11 +7,8 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from backend.app.db.crud import (
-    add_chat_message,
     get_activities_by_date,
-    get_chat_messages,
     get_daily_summary_by_date,
-    get_garmin_credential,
     get_or_create_user,
     get_training_plans_in_range,
     get_user_profile,
@@ -69,7 +66,7 @@ class ChatService:
         self,
         *,
         db: Session,
-        wechat_user_id: int,
+        user_id: int,
         message: str,
     ) -> str:
         """
@@ -77,39 +74,22 @@ class ChatService:
 
         Args:
             db: 数据库会话
-            wechat_user_id: 微信用户 ID
+            user_id: 用户 ID
             message: 用户消息
 
         Returns:
             AI 教练的回复文本
         """
-        # 获取用户凭证
-        credential = get_garmin_credential(db, wechat_user_id=wechat_user_id)
-        if not credential:
-            return "请先绑定 Garmin 账号，然后再来和我聊天吧！🏃‍♂️"
-
-        # 获取 User
-        user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+        # 获取用户
+        user = db.query(User).filter(User.id == user_id).one_or_none()
         if not user:
-            return "用户不存在，请先绑定 Garmin 账号。"
-
-        # 保存用户消息
-        try:
-            add_chat_message(
-                db,
-                wechat_user_id=wechat_user_id,
-                role="user",
-                content=message,
-            )
-            db.commit()
-        except Exception as e:
-            logger.warning(f"[Chat] Failed to save user message: {e}")
+            return "用户不存在。"
 
         # 构建上下文
-        context = self._build_context(db, user.id, credential, message)
+        context = self._build_context(db, user.id, message)
 
         # 打印完整提示词用于调试
-        logger.info(f"[Chat] Full prompt for user {wechat_user_id}:\n{context}")
+        logger.info(f"[Chat] Full prompt for user {user_id}:\n{context}")
 
         try:
             reply = self.gemini.chat(context)
@@ -117,25 +97,12 @@ class ChatService:
             logger.warning(f"[Chat] Gemini failed: {e}")
             return "对话暂不可用，请稍后重试。"
 
-        # 保存 AI 回复
-        try:
-            add_chat_message(
-                db,
-                wechat_user_id=wechat_user_id,
-                role="assistant",
-                content=reply,
-            )
-            db.commit()
-        except Exception as e:
-            logger.warning(f"[Chat] Failed to save assistant message: {e}")
-
         return reply
 
     def _build_context(
         self,
         db: Session,
         user_id: int,
-        credential: GarminCredential,
         user_message: str,
     ) -> str:
         """构建聊天上下文"""

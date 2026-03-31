@@ -12,7 +12,6 @@ from backend.app.db.crud import (
     get_activities_by_date,
     get_cached_analysis,
     get_daily_summary_by_date,
-    get_garmin_credential,
     get_or_create_user,
     get_training_plans_in_range,
     get_user_profile,
@@ -55,35 +54,32 @@ class ReportService:
     def build_daily_analysis(
         self,
         *,
-        wechat_user_id: Optional[int],
+        user_id: Optional[int],
         analysis_date: str,
         force_refresh: bool,
         db: Optional[Session],
     ) -> dict[str, Any]:
         request_start_time = time.time()
         analysis_date_obj = datetime.strptime(analysis_date, "%Y-%m-%d").date()
-        credential = None
-        if db is not None and wechat_user_id is not None:
-            credential = get_garmin_credential(db, wechat_user_id=wechat_user_id)
 
-        if wechat_user_id is not None:
+        if user_id is not None:
             if db is None:
                 raise HTTPException(status_code=500, detail="数据库不可用")
-            if not settings.USE_MOCK_MODE and credential is None:
-                raise HTTPException(status_code=403, detail="请先绑定 Garmin 账号")
+            # 直接使用user_id，不再通过WechatUser获取凭证
 
         garmin_identity_email: Optional[str] = None
-        if credential is not None and credential.garmin_email:
-            garmin_identity_email = credential.garmin_email
-        elif wechat_user_id is None:
+        if user_id is None:
             garmin_identity_email = settings.GARMIN_EMAIL
 
         db_user_id: Optional[int] = None
         cache_hours = max(int(settings.ANALYSIS_CACHE_HOURS), 0)
-        if db is not None and garmin_identity_email:
-            try:
-                user = get_or_create_user(db, garmin_email=garmin_identity_email)
-                db_user_id = user.id
+        if db is not None:
+            if user_id:
+                db_user_id = user_id
+            elif garmin_identity_email:
+                try:
+                    user = get_or_create_user(db, garmin_email=garmin_identity_email)
+                    db_user_id = user.id
                 if not force_refresh:
                     cached = get_cached_analysis(db, user_id=db_user_id, analysis_date=analysis_date_obj)
                     if cached is not None:
@@ -380,7 +376,7 @@ class ReportService:
     def sync_recent_history(
         self,
         *,
-        wechat_user_id: int,
+        user_id: int,
         days: int,
         db: Session,
     ) -> dict[str, int]:
@@ -404,12 +400,15 @@ class ReportService:
                 "health_days_synced": 0,
             }
 
-        credential = get_garmin_credential(db, wechat_user_id=wechat_user_id)
-        if credential is None:
-            raise RuntimeError("Garmin 未绑定，无法执行历史回填")
-
-        garmin_password = decrypt_text(credential.garmin_password)
-        user = get_or_create_user(db, garmin_email=credential.garmin_email)
+        # 直接使用user_id获取用户信息
+        from backend.app.db.models import User
+        user = db.query(User).filter(User.id == user_id).one_or_none()
+        if user is None:
+            raise RuntimeError("用户不存在")
+            
+        garmin_email = user.garmin_email
+        garmin_password = decrypt_text(user.garmin_password)
+        is_cn = bool(user.is_cn)
         db_user_id = user.id
 
         # 确保在非mock模式下才导入和使用GarminService和GarminClient
@@ -417,11 +416,11 @@ class ReportService:
         from src.services.garmin_service import GarminService
 
         garmin_client = GarminClient(
-            email=credential.garmin_email,
+            email=garmin_email,
             password=garmin_password,
-            is_cn=bool(credential.is_cn),
+            is_cn=is_cn,
         )
-        garmin_service = GarminService(credential.garmin_email, garmin_password)
+        garmin_service = GarminService(garmin_email, garmin_password)
 
         summary = {
             "days_requested": int(days),

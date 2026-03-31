@@ -7,20 +7,10 @@ USE garmin_coach;
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     garmin_email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
--- Garmin凭证表
-CREATE TABLE IF NOT EXISTS garmin_credentials (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    wechat_user_id INT NOT NULL,
-    garmin_email VARCHAR(255) NOT NULL,
     garmin_password TEXT NOT NULL,
     is_cn BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY `unique_user_credential` (`wechat_user_id`)
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
 -- 活动表
@@ -86,13 +76,14 @@ CREATE TABLE IF NOT EXISTS garmin_daily_summaries (
 -- 首页摘要缓存表
 CREATE TABLE IF NOT EXISTS home_summaries (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    wechat_user_id INT NOT NULL,
+    user_id INT NOT NULL,
     latest_run_json JSON,
     week_stats_json JSON,
     month_stats_json JSON,
     ai_brief_json JSON,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    UNIQUE KEY `unique_wechat_user` (`wechat_user_id`)
+    UNIQUE KEY `unique_user` (`user_id`),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- 伤病日志表
@@ -135,12 +126,8 @@ CREATE TABLE IF NOT EXISTS coach_memory (
     UNIQUE KEY `unique_user_memory` (`user_id`)
 );
 
--- 插入默认测试用户
-INSERT INTO users (garmin_email) VALUES ('test@example.com') ON DUPLICATE KEY UPDATE garmin_email = garmin_email;
-
--- 插入默认Wechat用户的Garmin凭证（密码已加密，实际使用时需要替换）
-INSERT INTO garmin_credentials (wechat_user_id, garmin_email, garmin_password, is_cn) 
-VALUES (1, 'test@example.com', 'encrypted_password_placeholder', FALSE)
+-- 插入默认测试用户（密码已加密，实际使用时需要替换）
+INSERT INTO users (garmin_email, garmin_password, is_cn) VALUES ('test@example.com', 'encrypted_password_placeholder', FALSE) 
 ON DUPLICATE KEY UPDATE garmin_email = garmin_email;
 
 -- 插入示例活动数据
