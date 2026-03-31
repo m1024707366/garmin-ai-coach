@@ -20,7 +20,7 @@ services:
       - ENABLE_GARMIN_POLLING=${ENABLE_GARMIN_POLLING:-false}
       - GARMIN_CRED_ENCRYPTION_KEY=${GARMIN_CRED_ENCRYPTION_KEY}
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
     ports:
       - "8000:8000"
     networks:
