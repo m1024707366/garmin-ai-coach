@@ -60,8 +60,8 @@ else:
                 "charts": None
             }
 
-from backend.app.db.crud import get_home_summary, upsert_home_summary, get_garmin_credential, get_coach_memory, upsert_coach_memory, get_injury_logs, create_injury_log, update_injury_log
-from backend.app.db.models import WechatUser, User
+from backend.app.db.crud import get_home_summary, upsert_home_summary, get_coach_memory, upsert_coach_memory, get_injury_logs, create_injury_log, update_injury_log
+from backend.app.db.models import User
 from backend.app.db.session import get_db_optional, init_db
 from src.core.config import settings
 
@@ -477,15 +477,11 @@ async def get_period_analysis(
     else:
         raise HTTPException(status_code=400, detail="无效的周期类型")
 
-    # 获取 Garmin 凭证和 User（crud/models 已在顶部导入）
+    # 获取用户（使用固定的用户ID）
     from backend.app.db.models import Activity, GarminDailySummary
     from sqlalchemy import func
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -711,10 +707,8 @@ async def create_injury_log_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -763,10 +757,8 @@ async def get_injury_logs_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -797,10 +789,8 @@ async def update_injury_log_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -849,10 +839,8 @@ async def get_coach_profile_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -908,10 +896,8 @@ async def update_coach_profile_endpoint(
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
 
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
@@ -977,10 +963,8 @@ async def morning_report_endpoint(
     """晨间报告：基于昨晚睡眠和近期训练负荷，给出今日训练建议。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     dt = date.fromisoformat(target_date) if target_date else date.today()
@@ -1003,10 +987,8 @@ async def evening_review_endpoint(
     """晚间复盘：基于今日训练数据，给出恢复建议和明日展望。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     dt = date.fromisoformat(target_date) if target_date else date.today()
@@ -1029,10 +1011,8 @@ async def weekly_summary_endpoint(
     """周度总结：过去 7 天训练回顾和下周训练方向建议。"""
     if not db:
         raise HTTPException(status_code=500, detail="数据库不可用")
-    credential = get_garmin_credential(db, wechat_user_id=1)
-    if not credential:
-        raise HTTPException(status_code=404, detail="Garmin 未绑定")
-    user = db.query(User).filter(User.garmin_email == credential.garmin_email).one_or_none()
+    # 获取用户（使用固定的用户ID）
+    user = db.query(User).filter(User.id == 1).one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     dt = date.fromisoformat(target_date) if target_date else date.today()
