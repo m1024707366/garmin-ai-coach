@@ -329,26 +329,6 @@ class UserProfile(Base):
     user: Mapped[User] = relationship(back_populates="profiles")
 
 
-class ChatMessage(Base):
-    """聊天消息记录"""
-    __tablename__ = "chat_messages"
-    __table_args__ = {"mysql_charset": "utf8mb4"}
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    wechat_user_id: Mapped[int] = mapped_column(ForeignKey("wechat_users.id", ondelete="CASCADE"), nullable=False)
-
-    # 消息角色和内容
-    role: Mapped[str] = mapped_column(String(16), nullable=False)  # "user" or "assistant"
-    content: Mapped[str] = mapped_column(LONGTEXT, nullable=False)
-
-    # 上下文信息
-    context_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
-
-    wechat_user: Mapped[WechatUser] = relationship(back_populates="chat_messages")
-
-
 class CoachMemory(Base):
     """运动员档案（教练记忆）"""
     __tablename__ = "coach_memories"
